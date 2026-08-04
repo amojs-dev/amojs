@@ -1,0 +1,19 @@
+{
+  "name": "amojs",
+  "private": true,
+  "type": "module",
+  "description": "AmoJS monorepo — a fine-grained UI compiler that writes the vanilla JS you would have written.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc -p ."
+  },
+  "devDependencies": {
+    "happy-dom": "^20.11.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
