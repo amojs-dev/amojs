@@ -1,0 +1,17 @@
+{
+  "name": "@amojs/compiler",
+  "version": "0.0.0-dev",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "AmoJS compiler — parse → IR → codegen. Runs on node only; never ships to browsers.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "acorn": "^8.18.0"
+  }
+}
