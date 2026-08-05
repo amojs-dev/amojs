@@ -16,7 +16,8 @@
  */
 
 import { parse } from 'acorn';
-import { detectTemplates } from './detect.js';
+import { detectTemplates, walk } from './detect.js';
+import type { AnyNode } from './detect.js';
 import { parseTemplate } from './template.js';
 import type { TemplateIR } from './ir.js';
 
@@ -28,8 +29,22 @@ export function compileModule(source: string): string {
   // right after the last original import statement
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
   let importEnd = 0;
+  let coreImport: AnyNode | null = null;
   for (const node of ast.body) {
-    if (node.type === 'ImportDeclaration') importEnd = node.end;
+    if (node.type !== 'ImportDeclaration') continue;
+    importEnd = node.end;
+    const decl = node as unknown as AnyNode;
+    if (
+      decl.source.value === '@amojs/core' &&
+      decl.specifiers.some(
+        (s: AnyNode) =>
+          s.type === 'ImportSpecifier' &&
+          s.imported.type === 'Identifier' &&
+          s.imported.name === 'html',
+      )
+    ) {
+      coreImport = decl;
+    }
   }
 
   /** completed rewrites, for mapping original offsets into the edited source */
@@ -61,9 +76,55 @@ export function compileModule(source: string): string {
     edits.push({ origEnd: t.end, delta: g.expr.length - (me - ms) });
   }
 
-  const names = ['tpl as _amoTpl'];
-  if (usesChild) names.push('bindChild as _amoBindChild');
-  if (usesAttr) names.push('bindAttr as _amoBindAttr');
+  // strip `html` from the core import when nothing references it anymore —
+  // a compiled module must not pull the template parser in raw-ESM setups
+  if (coreImport) {
+    const htmlSpecs: AnyNode[] = coreImport.specifiers.filter(
+      (s: AnyNode) =>
+        s.type === 'ImportSpecifier' &&
+        s.imported.type === 'Identifier' &&
+        s.imported.name === 'html',
+    );
+    const exclude = new Set<number>();
+    for (const s of htmlSpecs) {
+      exclude.add(s.local.start);
+      exclude.add(s.imported.start);
+    }
+    for (const { t } of ordered) exclude.add(t.start); // the tags we replaced
+    const locals = new Set(htmlSpecs.map((s) => s.local.name as string));
+    const stillUsed = new Set<string>();
+    walk(ast as unknown as AnyNode, (n) => {
+      if (n.type === 'Identifier' && locals.has(n.name) && !exclude.has(n.start)) {
+        stillUsed.add(n.name);
+      }
+    });
+    const removable = htmlSpecs.filter((s) => !stillUsed.has(s.local.name));
+    const allNamed = coreImport.specifiers.every(
+      (s: AnyNode) => s.type === 'ImportSpecifier',
+    );
+    if (removable.length > 0 && allNamed) {
+      const keep: AnyNode[] = coreImport.specifiers.filter(
+        (s: AnyNode) => !removable.includes(s),
+      );
+      const text = keep.length
+        ? `import { ${keep
+            .map((s) =>
+              s.imported.name === s.local.name
+                ? s.local.name
+                : `${s.imported.name} as ${s.local.name}`,
+            )
+            .join(', ')} } from '@amojs/core';`
+        : '';
+      const ms = map(coreImport.start);
+      const me = map(coreImport.end);
+      src = src.slice(0, ms) + text + src.slice(me);
+      edits.push({ origEnd: coreImport.end, delta: text.length - (me - ms) });
+    }
+  }
+
+  const names = ['tpl as _$t'];
+  if (usesChild) names.push('bindChild as _$child');
+  if (usesAttr) names.push('bindAttr as _$attr');
   const header =
     `\nimport { ${names.join(', ')} } from "@amojs/core/compiled";\n` +
     hoisted.join('\n') +
@@ -82,16 +143,37 @@ interface Generated {
   usesAttr: boolean;
 }
 
+/** `.firstChild` for index 0, `.childNodes[i]` otherwise — like a human. */
+function accessor(indexes: number[]): string {
+  return indexes
+    .map((i) => (i === 0 ? '.firstChild' : `.childNodes[${i}]`))
+    .join('');
+}
+
 function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
-  const tplVar = `_amo_t${id}`;
+  const tplVar = `_t${id}`;
   const placeholderPaths = ir.holes
     .filter((h) => h.kind === 'child')
     .map((h) => h.path);
-  const hoisted = `const ${tplVar} = _amoTpl(${JSON.stringify(ir.html)}, ${JSON.stringify(placeholderPaths)});`;
+  const hoisted = `const ${tplVar} = _$t(${JSON.stringify(ir.html)}, ${JSON.stringify(placeholderPaths)});`;
 
-  const lines: string[] = [`const _f = ${tplVar}();`];
+  // static unwrap decision — mirrors the runtime's unwrap() exactly.
+  // when the single root element is all we ever hand out, skip the fragment
+  // variable entirely and root the walks at the element itself.
+  const rootChildHole = ir.holes.some((h) => h.kind === 'child' && h.path.length === 1);
+  const unwrapIdx =
+    ir.singleRootIndex !== null && !rootChildHole ? ir.singleRootIndex : null;
+
+  const lines: string[] = [];
   const vars = new Map<string, string>();
   let n = 0;
+  if (unwrapIdx !== null) {
+    vars.set(String(unwrapIdx), '_r');
+    lines.push(`const _r = ${tplVar}()${accessor([unwrapIdx])};`);
+  } else {
+    lines.push(`const _f = ${tplVar}();`);
+  }
+
   const varFor = (path: number[]): string => {
     if (path.length === 0) return '_f';
     const key = path.join(',');
@@ -101,13 +183,9 @@ function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
       let baseLen = path.length - 1;
       while (baseLen > 0 && !vars.has(path.slice(0, baseLen).join(','))) baseLen--;
       const base = baseLen === 0 ? '_f' : vars.get(path.slice(0, baseLen).join(','));
-      const rest = path
-        .slice(baseLen)
-        .map((i) => `.childNodes[${i}]`)
-        .join('');
       v = `_n${n++}`;
       vars.set(key, v);
-      lines.push(`const ${v} = ${base}${rest};`);
+      lines.push(`const ${v} = ${base}${accessor(path.slice(baseLen))};`);
     }
     return v;
   };
@@ -124,22 +202,14 @@ function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
       lines.push(`${v}.addEventListener(${JSON.stringify(h.name)}, ${e});`);
     } else if (h.kind === 'attr') {
       usesAttr = true;
-      lines.push(`_amoBindAttr(${v}, ${JSON.stringify(h.name)}, ${e});`);
+      lines.push(`_$attr(${v}, ${JSON.stringify(h.name)}, ${e});`);
     } else {
       usesChild = true;
-      lines.push(`_amoBindChild(${v}, ${e});`);
+      lines.push(`_$child(${v}, ${e});`);
     }
   }
 
-  // static unwrap decision — mirrors the runtime's unwrap() exactly
-  const rootChildHole = ir.holes.some((h) => h.kind === 'child' && h.path.length === 1);
-  let ret = '_f';
-  if (ir.singleRootIndex !== null && !rootChildHole) {
-    ret =
-      vars.get(String(ir.singleRootIndex)) ??
-      `_f.childNodes[${ir.singleRootIndex}]`;
-  }
-  lines.push(`return ${ret};`);
+  lines.push(`return ${unwrapIdx !== null ? '_r' : '_f'};`);
 
   const expr = `(() => {\n  ${lines.join('\n  ')}\n})()`;
   return { hoisted, expr, usesChild, usesAttr };

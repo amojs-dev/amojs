@@ -68,14 +68,14 @@ export function detectTemplates(source: string): DetectedTemplate[] {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type AnyNode = { type: string; start: number; end: number } & Record<string, any>;
+export type AnyNode = { type: string; start: number; end: number } & Record<string, any>;
 
 /**
  * Minimal depth-first AST walker. acorn nodes are plain objects whose
  * children are either nodes (have a string `type`) or arrays of nodes —
- * ~20 lines instead of a dependency.
+ * ~20 lines instead of a dependency. (Shared with codegen.)
  */
-function walk(node: AnyNode, visit: (n: AnyNode) => void): void {
+export function walk(node: AnyNode, visit: (n: AnyNode) => void): void {
   visit(node);
   for (const key of Object.keys(node)) {
     if (key === 'type') continue;

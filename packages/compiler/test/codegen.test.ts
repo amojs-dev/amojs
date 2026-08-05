@@ -22,14 +22,15 @@ test('compiles the counter: hoisted template, walks, bindings — no html`` left
   expect(out).toContain('c:<!---->|<!----></button>'); // static html + hole markers
   expect(out).toContain('[[0,1],[0,3]]'); // placeholder paths
   expect(out).toContain('.addEventListener("click", () => count.value++)');
-  expect(out).toContain('_amoBindChild');
+  expect(out).toContain('_$child(');
   // helper import + hoisted template land AFTER the original imports
   expect(out.indexOf('@amojs/core/compiled')).toBeGreaterThan(out.indexOf("'@amojs/core'"));
 });
 
-test('unwrap decision is static: single-root template returns the element var', () => {
+test('unwrap decision is static: single-root template roots the walks at the element', () => {
   const out = compileModule(COUNTER);
-  expect(out).toContain('return _n0;');
+  expect(out).toContain('const _r = _t0().firstChild;');
+  expect(out).toContain('return _r;');
   expect(out).not.toContain('return _f;');
 });
 
@@ -42,8 +43,8 @@ test('nested templates compile innermost-first, offsets stay correct', () => {
   ].join('\n');
   const out = compileModule(src);
   expect(out).not.toContain('html`');
-  expect(out).toContain('_amo_t0');
-  expect(out).toContain('_amo_t1');
+  expect(out).toContain('_t0');
+  expect(out).toContain('_t1');
   expect(out).toContain('<em>in</em>');
 });
 
@@ -53,7 +54,7 @@ test('only used helpers are imported', () => {
     'export const el = html`<p>static</p>`;',
   ].join('\n');
   const out = compileModule(src);
-  expect(out).toContain('tpl as _amoTpl');
-  expect(out).not.toContain('_amoBindChild');
-  expect(out).not.toContain('_amoBindAttr');
+  expect(out).toContain('tpl as _$t');
+  expect(out).not.toContain('_$child');
+  expect(out).not.toContain('_$attr');
 });
