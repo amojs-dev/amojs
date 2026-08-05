@@ -36,11 +36,8 @@ export function bindChild(placeholder, v) {
     reactiveChild(placeholder, () => v.value);
   } else if (typeof v === 'function') {
     reactiveChild(placeholder, v);
-  } else if (v instanceof Node) {
-    // constant — written once
-    placeholder.replaceWith(...normalizeNodes(v));
-  } else if (Array.isArray(v)) {
-    placeholder.replaceWith(...v.map(assertNode));
+  } else if (isNodeish(v)) {
+    placeholder.replaceWith(...toNodes(v)); // constant — written once
   } else {
     placeholder.data = asText(v);
   }
@@ -55,20 +52,18 @@ function reactiveChild(anchor, read) {
   let block = [];
   let textMode = true;
   effect(() => {
-    let v = read();
-    if (v instanceof Node) v = normalizeNodes(v);
-    if (Array.isArray(v)) {
-      v.forEach(assertNode);
+    const v = read();
+    const parent = /** @type {Node} */ (anchor.parentNode);
+    if (isNodeish(v)) {
+      const nodes = toNodes(v);
       if (textMode) {
         anchor.data = '';
         textMode = false;
       }
-      const parent = /** @type {Node} */ (anchor.parentNode);
-      reconcile(parent, block, v, anchor);
-      block = v.slice();
+      reconcile(parent, block, nodes, anchor);
+      block = nodes;
     } else {
       if (!textMode) {
-        const parent = /** @type {Node} */ (anchor.parentNode);
         for (const n of block) parent.removeChild(n);
         block = [];
         textMode = true;
@@ -80,23 +75,28 @@ function reactiveChild(anchor, read) {
 }
 
 /**
- * A DocumentFragment melts into its children on insertion — capture them.
- * @param {Node} v
- * @returns {Node[]}
+ * @param {*} v
+ * @returns {boolean} does this value render as nodes rather than as text?
  */
-function normalizeNodes(v) {
-  return v.nodeType === 11 ? [...v.childNodes] : [v];
+function isNodeish(v) {
+  return v instanceof Node || Array.isArray(v);
 }
 
 /**
- * @param {*} n
- * @returns {Node}
+ * The node list a value renders to. A DocumentFragment melts into its
+ * children on insertion, so capture them up front; anything else must be a
+ * plain node (a fragment nested in an array has no stable identity).
+ * @param {Node | *[]} v
+ * @returns {Node[]}
  */
-function assertNode(n) {
-  if (!(n instanceof Node) || n.nodeType === 11) {
-    throw new Error('amo: array holes take non-fragment nodes only');
-  }
-  return n;
+function toNodes(v) {
+  if (v instanceof Node) return v.nodeType === 11 ? [...v.childNodes] : [v];
+  return v.map((n) => {
+    if (!(n instanceof Node) || n.nodeType === 11) {
+      throw new Error('amo: array holes take non-fragment nodes only');
+    }
+    return n;
+  });
 }
 
 /**
@@ -104,11 +104,23 @@ function assertNode(n) {
  * null/undefined/false remove the attribute; true sets it empty.
  * Writes are skipped when the DOM already holds the same value — an effect
  * re-running must never cause DOM work its result doesn't require.
+ *
+ * `ref` is the one reserved name: it hands the element over instead of
+ * writing an attribute. Handled here rather than in the compiler, so raw and
+ * compiled mode get it from the same three lines.
  * @param {Element} el
  * @param {string} name
  * @param {*} v
  */
 export function bindAttr(el, name, v) {
+  if (name === 'ref') {
+    // one-shot identity handoff, never reactive: a function is called with
+    // the element, a signal receives it. The node exists but is NOT in the
+    // document yet — pair it with onMount() when you need a live node.
+    if (typeof v === 'function') v(el);
+    else v.value = el;
+    return;
+  }
   /** @param {*} val */
   const apply = (val) => {
     if (val == null || val === false) {

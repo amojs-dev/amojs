@@ -7,6 +7,8 @@
  * parser in. A fully compiled app never loads html.js.
  */
 
-export { signal, computed, effect, isSignal, flushSync, tick, root, onCleanup } from './signal.js';
+export {
+  signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount,
+} from './signal.js';
 export { mount } from './mount.js';
 export { each } from './each.js';

@@ -21,7 +21,7 @@ let writeVersion = 0;
 let activeReaction = null;
 
 /**
- * @type {Effect | Root | null} the scope that adopts reactions created now.
+ * @type {Root | null} the scope that adopts reactions created now.
  * Ownership follows CREATION, not insertion: whatever a scope makes during
  * its run belongs to it — and is torn down when the scope re-runs or dies.
  */
@@ -95,39 +95,38 @@ export class Computed {
   }
 }
 
-class Effect {
-  /** @param {() => *} fn */
-  constructor(fn) {
-    if (activeReaction instanceof Computed) {
-      throw new Error('amo: no effect() inside computed()');
-    }
-    /** the user function (module-internal, not public API) */
-    this._fn = fn;
-    this.lastWv = 0;
-    this.state = DIRTY;
-    this.queued = false;
+/**
+ * An ownership scope: it owns whatever reactions are created during its run
+ * and kills them when it dies. `root()` uses one directly; an Effect IS one
+ * that also reacts.
+ */
+class Root {
+  constructor() {
     this.disposed = false;
-    /** @type {(Signal | Computed)[]} */
-    this.deps = [];
     /** @type {(Computed | Effect)[] | null} reactions created during our runs */
     this.children = null;
     /** @type {(() => void)[] | null} run before every re-run and on dispose */
     this.cleanups = null;
     /** @type {(() => void)[] | null} run on final dispose only (see onDispose) */
     this.disposals = null;
-    if (activeOwner) (activeOwner.children ??= []).push(this);
   }
 }
 
-/** A plain ownership scope with no reaction of its own (see root()). */
-class Root {
-  constructor() {
-    /** @type {(Computed | Effect)[] | null} */
-    this.children = null;
-    /** @type {(() => void)[] | null} */
-    this.cleanups = null;
-    /** @type {(() => void)[] | null} */
-    this.disposals = null;
+class Effect extends Root {
+  /** @param {() => *} fn */
+  constructor(fn) {
+    if (activeReaction instanceof Computed) {
+      throw new Error('amo: no effect() inside computed()');
+    }
+    super();
+    /** the user function (module-internal, not public API) */
+    this._fn = fn;
+    this.lastWv = 0;
+    this.state = DIRTY;
+    this.queued = false;
+    /** @type {(Signal | Computed)[]} */
+    this.deps = [];
+    if (activeOwner) (activeOwner.children ??= []).push(this);
   }
 }
 
@@ -170,11 +169,24 @@ function runWith(r, fn) {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Take a callback list off a scope and run every entry exactly once. Detached
+ * before running, so a callback that registers more does not loop forever.
+ * @param {Root} o
+ * @param {'cleanups' | 'disposals'} key
+ */
+function drain(o, key) {
+  const fns = o[key];
+  if (!fns) return;
+  o[key] = null;
+  for (const fn of fns) fn();
+}
+
+/**
  * Tear down what a scope produced during its last run: child reactions
  * (depth-first, children before parents), then the scope's own cleanups.
  * Re-running an effect calls this first — every run starts from a blank
  * slate, so nothing a previous run made can leak.
- * @param {Effect | Root} o
+ * @param {Root} o
  */
 function teardown(o) {
   if (o.children) {
@@ -182,20 +194,7 @@ function teardown(o) {
     o.children = null;
     for (const c of kids) dispose(c);
   }
-  if (o.cleanups) {
-    const fns = o.cleanups;
-    o.cleanups = null;
-    for (const fn of fns) fn();
-  }
-}
-
-/** @param {Effect | Root} o */
-function runDisposals(o) {
-  if (o.disposals) {
-    const fns = o.disposals;
-    o.disposals = null;
-    for (const fn of fns) fn();
-  }
+  drain(o, 'cleanups');
 }
 
 /**
@@ -210,7 +209,7 @@ function dispose(r) {
     if (r.disposed) return;
     r.disposed = true;
     teardown(r);
-    runDisposals(r);
+    drain(r, 'disposals');
   } else {
     r.state = DIRTY;
   }
@@ -303,20 +302,91 @@ function schedule(e) {
   if (e.queued || e.disposed) return;
   e.queued = true;
   queue.push(e);
+  wake();
+}
+
+function wake() {
   if (!scheduled) {
     scheduled = true;
     queueMicrotask(flushSync);
   }
 }
 
-/** Run every queued effect now. (Normally happens automatically in a microtask.) */
+/**
+ * One thrown callback must never strand the rest of the batch: every failure
+ * is collected, the queue drains to the end, and the error is re-thrown
+ * afterwards. Thrown from the flush means it reaches the platform's uncaught
+ * handler — the same place a vanilla listener's exception would land.
+ * @param {unknown[]} errors
+ */
+function rethrow(errors) {
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, 'amo: several callbacks failed');
+}
+
+/** Run every queued effect (and post-insertion callback) now. */
 export function flushSync() {
   scheduled = false;
+  /** @type {unknown[]} */
+  const errors = [];
   let e;
   while ((e = queue.shift()) !== undefined) {
     e.queued = false;
-    runEffect(e);
+    try {
+      runEffect(e);
+    } catch (err) {
+      errors.push(err);
+    }
   }
+  drainMounts(errors);
+  rethrow(errors);
+}
+
+/* ------------------------------------------------------------------ */
+/* post-insertion callbacks (onMount)                                  */
+/* ------------------------------------------------------------------ */
+
+/** @type {(() => void)[]} */
+let mounts = [];
+
+/**
+ * Run `fn` once, after the nodes built by the current work are in the
+ * document — for anything that needs a LIVE node: measuring layout, focus,
+ * observers, or handing an element to a third-party library.
+ *
+ * A component function runs while its nodes are still detached, so this is
+ * the moment that does not exist otherwise. Drained by mount() right after
+ * insertion, and at the end of every flush (so a component instantiated by a
+ * conditional or a list gets it too). Skipped if its scope died first.
+ * @param {() => void} fn
+ */
+export function onMount(fn) {
+  const owner = activeOwner;
+  mounts.push(owner ? () => { if (!owner.disposed) fn(); } : fn);
+  wake(); // safety net for a node appended by hand, without mount()
+}
+
+/** @param {unknown[]} errors */
+function drainMounts(errors) {
+  while (mounts.length > 0) {
+    const fns = mounts;
+    mounts = []; // a callback may queue more — those run in the next round
+    for (const fn of fns) {
+      try {
+        fn();
+      } catch (err) {
+        errors.push(err);
+      }
+    }
+  }
+}
+
+/** Module-internal: mount() drains synchronously right after inserting. */
+export function flushMount() {
+  /** @type {unknown[]} */
+  const errors = [];
+  drainMounts(errors);
+  rethrow(errors);
 }
 
 /** @returns {Promise<void>} resolves after pending effects have flushed */
@@ -379,8 +449,9 @@ export function root(fn) {
   activeReaction = null; // reads inside a root are deliberate non-subscriptions
   try {
     return fn(() => {
+      r.disposed = true;
       teardown(r);
-      runDisposals(r);
+      drain(r, 'disposals');
     });
   } finally {
     activeOwner = prevOwner;

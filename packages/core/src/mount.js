@@ -4,7 +4,7 @@
  * without touching the template parser.
  */
 
-import { root } from './signal.js';
+import { root, flushMount } from './signal.js';
 
 /**
  * Instantiate a component (or take a node) and append it to a target.
@@ -18,5 +18,6 @@ export function mount(component, target) {
   const node =
     typeof component === 'function' ? root(() => component()) : component;
   target.append(node);
+  flushMount(); // the node is live now — onMount callbacks may run
   return node;
 }
