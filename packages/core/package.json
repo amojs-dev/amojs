@@ -5,7 +5,8 @@
   "license": "MIT",
   "description": "AmoJS reactive core — signals, html`` templates, mount. Zero dependencies; runs raw in the browser.",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./compiled": "./src/compiled.js"
   },
   "engines": {
     "node": ">=20"

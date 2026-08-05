@@ -52,6 +52,10 @@ class Parser {
   private el: OpenElement | null = null;
   /** set when a part ended in an attribute-value hole; consumed at next part */
   private resume: { quote: string | null } | null = null;
+  /** root-level bookkeeping for the static unwrap decision */
+  private rootElements = 0;
+  private rootElementIndex = -1;
+  private rootOther = false;
 
   constructor(private readonly strings: readonly string[]) {}
 
@@ -94,7 +98,9 @@ class Parser {
     if (this.stack.length > 1) {
       this.fail(`unclosed <${this.top().tag}>`, this.strings.length - 1);
     }
-    return { html: this.html, holes: this.holes };
+    const singleRootIndex =
+      this.rootElements === 1 && !this.rootOther ? this.rootElementIndex : null;
+    return { html: this.html, holes: this.holes, singleRootIndex };
   }
 
   /** A part boundary is a hole. Legal only in text position or as a full attr value. */
@@ -105,6 +111,10 @@ class Parser {
     }
     const f = this.top();
     this.textOpen = false;
+    // an empty comment marks the spot: it keeps adjacent static text nodes
+    // apart through serialize→parse, so NodePaths stay valid. Consumers swap
+    // it for an empty text node (see @amojs/core/compiled tpl()).
+    this.html += '<!---->';
     this.holes.push({ kind: 'child', expr: p, path: [...f.path, f.count++] });
   }
 
@@ -115,6 +125,7 @@ class Parser {
           this.textOpen = true;
           this.top().count++;
         }
+        if (this.stack.length === 1 && !/\s/.test(s[i])) this.rootOther = true;
         this.html += s[i];
         i++;
         continue;
@@ -141,6 +152,7 @@ class Parser {
         const end = s.indexOf('-->', i + 4);
         if (end === -1) this.fail('a hole cannot appear inside a comment', p);
         this.textOpen = false;
+        if (this.stack.length === 1) this.rootOther = true;
         this.top().count++;
         this.html += s.slice(i, end + 3);
         i = end + 3;
@@ -157,7 +169,12 @@ class Parser {
         }
         this.textOpen = false;
         const parent = this.top();
-        this.el = { tag, path: [...parent.path, parent.count++], attrs: '' };
+        const path = [...parent.path, parent.count++];
+        if (this.stack.length === 1) {
+          this.rootElements++;
+          this.rootElementIndex = path[0];
+        }
+        this.el = { tag, path, attrs: '' };
         return i + m[0].length;
       }
 
@@ -166,6 +183,7 @@ class Parser {
         this.textOpen = true;
         this.top().count++;
       }
+      if (this.stack.length === 1) this.rootOther = true;
       this.html += '<';
       i++;
     }

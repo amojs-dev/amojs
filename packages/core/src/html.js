@@ -16,7 +16,7 @@
  * delegation will be an explicit opt-in, never a default).
  */
 
-import { effect, isSignal } from './signal.js';
+import { bindChild, bindAttr } from './bind.js';
 
 /* Hole markers use unicode private-use codepoints: they survive HTML parsing
    in both text and attribute positions and cannot collide with real content.
@@ -198,56 +198,7 @@ function resolvePath(root, path) {
 }
 
 /* ------------------------------------------------------------------ */
-/* bind: apply the hole rule                                           */
-/* ------------------------------------------------------------------ */
-
-/**
- * @param {*} v
- * @returns {string}
- */
-function asText(v) {
-  return v == null || v === false ? '' : String(v);
-}
-
-/**
- * @param {Text} placeholder
- * @param {*} v
- */
-function bindChild(placeholder, v) {
-  if (isSignal(v)) {
-    effect(() => {
-      placeholder.data = asText(v.value);
-    });
-  } else if (typeof v === 'function') {
-    effect(() => {
-      placeholder.data = asText(v());
-    });
-  } else if (v instanceof Node) {
-    placeholder.replaceWith(v);
-  } else if (Array.isArray(v)) {
-    throw new Error('amo: arrays in holes arrive with keyed lists (v0.3)');
-  } else {
-    placeholder.data = asText(v);
-  }
-}
-
-/**
- * @param {Element} el
- * @param {string} name
- * @param {*} v
- */
-function bindAttr(el, name, v) {
-  /** @param {*} val */
-  const apply = (val) => {
-    if (val == null || val === false) el.removeAttribute(name);
-    else if (val === true) el.setAttribute(name, '');
-    else el.setAttribute(name, String(val));
-  };
-  if (isSignal(v)) effect(() => apply(v.value));
-  else if (typeof v === 'function') effect(() => apply(v()));
-  else apply(v);
-}
-
+/* binding lives in bind.js — shared with compiled mode                */
 /* ------------------------------------------------------------------ */
 /* ergonomics: single-root templates hand back the element itself      */
 /* ------------------------------------------------------------------ */

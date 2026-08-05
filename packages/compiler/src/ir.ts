@@ -55,11 +55,20 @@ export type Hole = ChildHole | AttrHole | EventHole;
 /** The IR of one `html\`…\`` template. */
 export interface TemplateIR {
   /**
-   * The static markup with holes removed. Child holes leave an empty text
-   * node behind (so NodePaths stay stable); attribute/event holes are
-   * stripped from the markup entirely.
+   * The static markup. Every child hole appears as an empty comment
+   * (`<!---->`) at its exact position — serialized HTML cannot express empty
+   * text nodes, and without a separator adjacent static texts would merge on
+   * reparse and shift every path. Consumers replace each marker comment with
+   * an empty text node once, on the cached template content.
+   * Attribute/event holes are stripped from the markup entirely.
    */
   html: string;
   /** All dynamic holes, in source order. */
   holes: Hole[];
+  /**
+   * If the template has exactly one root ELEMENT and nothing else at root
+   * level except whitespace text, this is that element's root child index —
+   * the static form of the runtime's "unwrap" decision. Otherwise null.
+   */
+  singleRootIndex: number | null;
 }

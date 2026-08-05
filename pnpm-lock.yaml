@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@types/node':
+        specifier: ^26.1.2
+        version: 26.1.2
       happy-dom:
         specifier: ^20.11.1
         version: 20.11.1

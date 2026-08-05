@@ -6,15 +6,17 @@ import { parseTemplate } from '../src/template.js';
 
 test('text hole: <p>${x}</p>', () => {
   expect(parseTemplate(['<p>', '</p>'])).toEqual({
-    html: '<p></p>',
+    html: '<p><!----></p>',
     holes: [{ kind: 'child', expr: 0, path: [0, 0] }],
+    singleRootIndex: 0,
   });
 });
 
 test('static text before a hole becomes its own node: <p>c:${x}</p>', () => {
   expect(parseTemplate(['<p>c:', '</p>'])).toEqual({
-    html: '<p>c:</p>',
+    html: '<p>c:<!----></p>',
     holes: [{ kind: 'child', expr: 0, path: [0, 1] }],
+    singleRootIndex: 0,
   });
 });
 
@@ -29,6 +31,7 @@ test('unquoted attribute hole on a void element: <img src=${u} alt="x">', () => 
   expect(parseTemplate(['<img src=', ' alt="x">'])).toEqual({
     html: '<img alt="x">',
     holes: [{ kind: 'attr', expr: 0, name: 'src', path: [0] }],
+    singleRootIndex: 0,
   });
 });
 
@@ -36,6 +39,7 @@ test('quoted attribute hole: <div class="${c}">t</div>', () => {
   expect(parseTemplate(['<div class="', '">t</div>'])).toEqual({
     html: '<div>t</div>',
     holes: [{ kind: 'attr', expr: 0, name: 'class', path: [0] }],
+    singleRootIndex: 0,
   });
 });
 
@@ -43,6 +47,7 @@ test('event hole: <button onclick=${f}>x</button>', () => {
   expect(parseTemplate(['<button onclick=', '>x</button>'])).toEqual({
     html: '<button>x</button>',
     holes: [{ kind: 'event', expr: 0, name: 'click', path: [0] }],
+    singleRootIndex: 0,
   });
 });
 
@@ -61,13 +66,13 @@ test('second root element: <i>a</i><i>${x}</i>', () => {
 
 test('void elements count as siblings: <div><br>${x}</div>', () => {
   const ir = parseTemplate(['<div><br>', '</div>']);
-  expect(ir.html).toBe('<div><br></div>');
+  expect(ir.html).toBe('<div><br><!----></div>');
   expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
 });
 
 test('comments count as siblings and pass through: <div><!--c-->${x}</div>', () => {
   const ir = parseTemplate(['<div><!--c-->', '</div>']);
-  expect(ir.html).toBe('<div><!--c--></div>');
+  expect(ir.html).toBe('<div><!--c--><!----></div>');
   expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
 });
 
@@ -77,12 +82,12 @@ test('boolean and unquoted static attributes pass through', () => {
 
 test('tag and attribute names are lowercased, values kept as-is', () => {
   const ir = parseTemplate(['<DIV CLASS="Ab">', '</DIV>']);
-  expect(ir.html).toBe('<div class="Ab"></div>');
+  expect(ir.html).toBe('<div class="Ab"><!----></div>');
 });
 
 test('entities pass through untouched: <p>&amp; ${x}</p>', () => {
   const ir = parseTemplate(['<p>&amp; ', '</p>']);
-  expect(ir.html).toBe('<p>&amp; </p>');
+  expect(ir.html).toBe('<p>&amp; <!----></p>');
   expect(ir.holes[0].path).toEqual([0, 1]);
 });
 
@@ -92,12 +97,24 @@ test('a lone "<" is text, exactly like the browser: <p>a < b</p>', () => {
 
 test('whitespace around a hole stays in separate text nodes: <p> ${x} </p>', () => {
   const ir = parseTemplate(['<p> ', ' </p>']);
-  expect(ir.html).toBe('<p>  </p>');
+  expect(ir.html).toBe('<p> <!----> </p>');
   expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
 });
 
 test('a template with no holes parses to plain IR', () => {
-  expect(parseTemplate(['<p>hi</p>'])).toEqual({ html: '<p>hi</p>', holes: [] });
+  expect(parseTemplate(['<p>hi</p>'])).toEqual({
+    html: '<p>hi</p>',
+    holes: [],
+    singleRootIndex: 0,
+  });
+});
+
+test('singleRootIndex: null for multiple roots or root-level text', () => {
+  expect(parseTemplate(['<i>a</i><i>b</i>']).singleRootIndex).toBe(null);
+  expect(parseTemplate(['x<p>t</p>']).singleRootIndex).toBe(null);
+  expect(parseTemplate(['<!--c--><p>t</p>']).singleRootIndex).toBe(null);
+  // whitespace around a single root is fine — and the index counts it
+  expect(parseTemplate(['  <p>t</p> ']).singleRootIndex).toBe(1);
 });
 
 /* ---------------- strict-subset errors ---------------- */
