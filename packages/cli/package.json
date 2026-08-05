@@ -1,0 +1,23 @@
+{
+  "name": "@amojs/cli",
+  "version": "0.4.0-dev",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "AmoJS CLI — `amo build`, `amo eject`. The framework you can uninstall.",
+  "bin": {
+    "amo": "./dist/main.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@amojs/compiler": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}

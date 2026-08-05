@@ -11,5 +11,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["packages"]
+  "include": ["packages"],
+  "exclude": ["**/dist", "**/__tmp__"]
 }

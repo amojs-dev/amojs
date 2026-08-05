@@ -7,9 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
+    "build": "pnpm -r run build",
+    "amo": "node packages/cli/dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "tsc -p ."
+    "check": "pnpm build && tsc -p ."
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
