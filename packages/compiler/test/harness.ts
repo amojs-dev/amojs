@@ -14,7 +14,10 @@ import { randomUUID } from 'node:crypto';
 const HERE = import.meta.url.startsWith('file:')
   ? dirname(fileURLToPath(import.meta.url))
   : dirname(import.meta.url);
-const TMP = join(HERE, '__tmp__');
+/* one subdir PER TEST FILE (fresh module instance per worker): parallel test
+   files must never share fixture space — an early afterAll cleanup would
+   delete a sibling file's fixture mid-import */
+const TMP = join(HERE, '__tmp__', randomUUID());
 const CORE_REL = relative(TMP, join(HERE, '../../core/src/index.js'))
   .split('\\')
   .join('/');

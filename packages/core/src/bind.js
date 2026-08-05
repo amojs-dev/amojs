@@ -10,6 +10,7 @@
  */
 
 import { effect, isSignal } from './signal.js';
+import { reconcile } from './list.js';
 
 /**
  * @param {*} v
@@ -21,25 +22,83 @@ export function asText(v) {
 
 /**
  * Bind a value to a placeholder text node (a child hole).
+ *
+ * Reactive values (signal | function) may produce text, a Node, or an array
+ * of Nodes — and may switch between those shapes over time. The placeholder
+ * text node doubles as the block ANCHOR: block nodes always sit immediately
+ * before it, so conditionals and keyed lists need no extra markers.
+ *
  * @param {Text} placeholder
  * @param {*} v
  */
 export function bindChild(placeholder, v) {
   if (isSignal(v)) {
-    effect(() => {
-      placeholder.data = asText(v.value);
-    });
+    reactiveChild(placeholder, () => v.value);
   } else if (typeof v === 'function') {
-    effect(() => {
-      placeholder.data = asText(v());
-    });
+    reactiveChild(placeholder, v);
   } else if (v instanceof Node) {
-    placeholder.replaceWith(v);
+    // constant — written once
+    placeholder.replaceWith(...normalizeNodes(v));
   } else if (Array.isArray(v)) {
-    throw new Error('amo: arrays in holes arrive with keyed lists (v0.3)');
+    placeholder.replaceWith(...v.map(assertNode));
   } else {
     placeholder.data = asText(v);
   }
+}
+
+/**
+ * @param {Text} anchor
+ * @param {() => *} read
+ */
+function reactiveChild(anchor, read) {
+  /** @type {Node[]} nodes currently rendered by this hole (block mode) */
+  let block = [];
+  let textMode = true;
+  effect(() => {
+    let v = read();
+    if (v instanceof Node) v = normalizeNodes(v);
+    if (Array.isArray(v)) {
+      v.forEach(assertNode);
+      if (textMode) {
+        anchor.data = '';
+        textMode = false;
+      }
+      const parent = /** @type {Node} */ (anchor.parentNode);
+      reconcile(parent, block, v, anchor);
+      block = v.slice();
+    } else {
+      if (!textMode) {
+        const parent = /** @type {Node} */ (anchor.parentNode);
+        for (const n of block) parent.removeChild(n);
+        block = [];
+        textMode = true;
+      }
+      anchor.data = asText(v);
+    }
+  });
+}
+
+/**
+ * A DocumentFragment melts into its children on insertion — capture them.
+ * @param {Node} v
+ * @returns {Node[]}
+ */
+function normalizeNodes(v) {
+  return v.nodeType === 11 ? [...v.childNodes] : [v];
+}
+
+/**
+ * @param {*} n
+ * @returns {Node}
+ */
+function assertNode(n) {
+  if (!(n instanceof Node)) {
+    throw new Error('amo: array holes must contain DOM nodes only');
+  }
+  if (n.nodeType === 11) {
+    throw new Error('amo: array holes cannot contain fragments — use single-root templates');
+  }
+  return n;
 }
 
 /**

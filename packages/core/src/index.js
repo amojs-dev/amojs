@@ -9,3 +9,4 @@
 
 export { signal, computed, effect, isSignal, flushSync, tick } from './signal.js';
 export { html, mount } from './html.js';
+export { each } from './each.js';
