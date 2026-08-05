@@ -13,9 +13,14 @@
  * cached node does NOT re-render — put signals inside items for that.
  * A key that disappears drops out of the cache; if it returns later it gets
  * a fresh node.
+ *
+ * Ownership (v0.5): every key's render runs in a DETACHED root, so list
+ * re-runs (reorders, appends) never touch living rows; a leaving key
+ * disposes exactly its own scope, and disposing the hole that hosts the
+ * list disposes every row.
  */
 
-import { isSignal } from './signal.js';
+import { isSignal, root, onDispose } from './signal.js';
 
 /**
  * @param {{ value: unknown } | (() => any[])} source  a signal holding an
@@ -32,28 +37,43 @@ export function each(source, key, render) {
     ? () => /** @type {{value: any[]}} */ (source).value
     : /** @type {() => any[]} */ (source);
 
-  /** @type {Map<unknown, Node>} */
+  /** @type {Map<unknown, { node: Node, dispose: () => void }>} */
   let cache = new Map();
+  /** rows must die with the hole hosting the list — not with its re-runs */
+  let hooked = false;
 
   return () => {
+    if (!hooked) {
+      hooked = onDispose(() => {
+        for (const entry of cache.values()) entry.dispose();
+        cache = new Map();
+      });
+    }
     const items = read();
-    /** @type {Map<unknown, Node>} */
+    /** @type {Map<unknown, { node: Node, dispose: () => void }>} */
     const next = new Map();
     const nodes = items.map((item, i) => {
       const k = key(item, i);
       if (next.has(k)) {
         throw new Error(`amo: duplicate key in each(): ${String(k)}`);
       }
-      let node = cache.get(k);
-      if (node === undefined) {
-        node = render(item, i);
-        if (/** @type {Node} */ (node).nodeType === 11) {
+      let entry = cache.get(k);
+      if (entry === undefined) {
+        // every key gets its own DETACHED root: the list effect re-runs on
+        // any change, and per-run teardown must never touch reused rows —
+        // a row's scope dies exactly when its key leaves.
+        entry = root((dispose) => ({ node: render(item, i), dispose }));
+        if (entry.node.nodeType === 11) {
+          entry.dispose();
           throw new Error('amo: each() render must return a single element, not a fragment');
         }
       }
-      next.set(k, node);
-      return node;
+      next.set(k, entry);
+      return entry.node;
     });
+    for (const [k, entry] of cache) {
+      if (!next.has(k)) entry.dispose(); // key left → its whole scope goes too
+    }
     cache = next;
     return nodes;
   };

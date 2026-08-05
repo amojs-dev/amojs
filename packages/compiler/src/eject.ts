@@ -33,7 +33,7 @@ const RUNTIME_INDEX = `/**
  * amo runtime — ejected copy. This code is YOURS now: readable, dependency-
  * free, and no longer connected to the amo package in any way.
  */
-export { signal, computed, effect, isSignal, flushSync, tick } from './signal.js';
+export { signal, computed, effect, isSignal, flushSync, tick, root, onCleanup } from './signal.js';
 export { html } from './html.js';
 export { mount } from './mount.js';
 export { each } from './each.js';
