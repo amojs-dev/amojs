@@ -46,8 +46,19 @@ export function reconcile(parent, prev, next, anchor) {
   // nodes whose old positions form the longest increasing subsequence are
   // already in relative order — anchor on them, move only the rest
   const stable = lis(next, bStart, bEnd, pos);
+  const tail = aEnd < prev.length ? prev[aEnd] : anchor;
 
-  let ref = aEnd < prev.length ? prev[aEnd] : anchor;
+  if (stable.size === 0) {
+    // nothing reused: insert in DOCUMENT ORDER, which is what a human writing
+    // vanilla does. The order matters beyond aesthetics — the first <option>
+    // to enter a <select> becomes the selected one, so a reversed insertion
+    // sequence silently selects the wrong item.
+    for (let i = bStart; i < bEnd; i++) parent.insertBefore(next[i], tail);
+    return;
+  }
+
+  // reordering: walk backwards so a single moving reference keeps moves minimal
+  let ref = tail;
   for (let i = bEnd - 1; i >= bStart; i--) {
     const n = next[i];
     if (!stable.has(n)) parent.insertBefore(n, ref);

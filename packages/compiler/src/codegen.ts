@@ -225,9 +225,17 @@ function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
   // resolve every node before any binding runs (bindings may replace nodes)
   for (const h of ir.holes) varFor(h.path);
 
+  // children first: an element's live properties must be set AFTER its
+  // children exist (`<select value=${x}>` cannot select an <option> that is
+  // not there yet), which is also the order a human writes. Stable sort, so
+  // document order survives within each group.
+  const ordered = [...ir.holes].sort(
+    (a, b) => (a.kind === 'child' ? 0 : 1) - (b.kind === 'child' ? 0 : 1),
+  );
+
   let usesChild = false;
   let usesAttr = false;
-  for (const h of ir.holes) {
+  for (const h of ordered) {
     const v = varFor(h.path);
     const e = exprs[h.expr];
     if (h.kind === 'event') {

@@ -121,9 +121,24 @@ export function bindAttr(el, name, v) {
     else v.value = el;
     return;
   }
+
+  /* For form state the attribute is only the DEFAULT and the live property is
+     the truth: setAttribute('value') stops showing after the user types, and
+     the `checked` attribute never follows a click. `<textarea value>` and
+     `<select value>` are not attributes at all. So for these names — and only
+     when the element really has the property — write the property, which is
+     also what a human writing vanilla does. */
+  const asProp = PROPS.has(name) && name in el;
+
   /** @param {*} val */
   const apply = (val) => {
-    if (val == null || val === false) {
+    if (asProp) {
+      // the element's own property type decides the coercion
+      const cur = /** @type {*} */ (el)[name];
+      const next =
+        typeof cur === 'boolean' ? !!val : val == null || val === false ? '' : String(val);
+      if (cur !== next) /** @type {*} */ (el)[name] = next;
+    } else if (val == null || val === false) {
       if (el.hasAttribute(name)) el.removeAttribute(name);
     } else {
       const s = val === true ? '' : String(val);
@@ -134,3 +149,6 @@ export function bindAttr(el, name, v) {
   else if (typeof v === 'function') effect(() => apply(v()));
   else apply(v);
 }
+
+/** names whose attribute and live property genuinely diverge */
+const PROPS = new Set(['value', 'checked', 'selected', 'indeterminate']);

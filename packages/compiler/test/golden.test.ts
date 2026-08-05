@@ -107,6 +107,47 @@ const NESTED = [
   '}',
 ].join('\n');
 
+/* ------------------------------------------------------------------ */
+
+const SHIFT = [
+  "import { signal, html } from '@amojs/core';",
+  "export { flushSync } from '@amojs/core';",
+  'export function App() {',
+  '  const a = html`<i>a</i>`;',
+  '  const b = html`<i>b</i>`;',
+  "  const cls = signal('target');",
+  '  // the child hole expands ONE placeholder into TWO nodes, shifting the',
+  '  // child index of every later sibling — the attr hole must still land on',
+  '  // the <span>, not on whichever node moved into its old slot',
+  '  const el = html`<div>${[a, b]}<span class=${cls}>x</span></div>`;',
+  '  return { el, cls };',
+  '}',
+].join('\n');
+
+test('GOLDEN a multi-node child hole must not shift its siblings’ bindings', async () => {
+  const compiled = compileModule(SHIFT);
+
+  const run = async (src: string) => {
+    const mod = await load(src);
+    const { el, cls } = mod.App();
+    const snap = () =>
+      [...el.children].map((c: Element) => `${c.tagName}:${c.getAttribute('class') ?? '-'}`);
+    const before = snap();
+    cls.value = 'changed';
+    mod.flushSync();
+    return { before, after: snap(), html: el.innerHTML };
+  };
+
+  const raw = await run(SHIFT);
+  const cmp = await run(compiled);
+
+  expect(cmp).toEqual(raw);
+  // raw mode used to put the class on <i>b</i> — compiled mode never did, so
+  // the two modes had silently diverged
+  expect(raw.before).toEqual(['I:-', 'I:-', 'SPAN:target']);
+  expect(raw.after).toEqual(['I:-', 'I:-', 'SPAN:changed']);
+});
+
 test('GOLDEN nested templates: raw and compiled produce the same markup', async () => {
   const compiled = compileModule(NESTED);
   expect(compiled).not.toContain('html`');

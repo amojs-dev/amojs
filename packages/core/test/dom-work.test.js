@@ -12,15 +12,27 @@
 import { test, expect } from 'vitest';
 import { signal, html, mount, each, flushSync } from '../src/index.js';
 
-/** @typedef {{ added: number, removed: number, text: number, attr: number }} Counts */
+/**
+ * @typedef {{ added: number, removed: number, text: number, attr: number,
+ *   insertOrder: string[] }} Counts
+ */
 
-/** @param {MutationObserver} mo @returns {Counts} */
+/**
+ * Counts AND the sequence of insertions. Order is part of the contract: the
+ * first `<option>` inserted into a `<select>` becomes the selected one, so a
+ * reversed insertion sequence is a real behavioral difference even when the
+ * final markup and the mutation COUNT are identical. Counting alone let that
+ * bug through once already.
+ * @param {MutationObserver} mo
+ * @returns {Counts}
+ */
 function drain(mo) {
-  const c = { added: 0, removed: 0, text: 0, attr: 0 };
+  const c = { added: 0, removed: 0, text: 0, attr: 0, insertOrder: /** @type {string[]} */ ([]) };
   for (const m of mo.takeRecords()) {
     if (m.type === 'childList') {
       c.added += m.addedNodes.length;
       c.removed += m.removedNodes.length;
+      for (const n of m.addedNodes) c.insertOrder.push(n.textContent ?? '');
     } else if (m.type === 'characterData') c.text++;
     else c.attr++;
   }
@@ -85,14 +97,20 @@ function vanillaApp() {
           rows.delete(id);
         }
       }
-      // same shape as amo's reconcile: walk backwards, skip nodes in place
-      let ref = null;
-      for (let i = next.length - 1; i >= 0; i--) {
-        const row = rows.get(next[i].id) ?? build(next[i]);
-        if (row.li.parentNode !== ul || row.li.nextSibling !== ref) {
-          ul.insertBefore(row.li, ref);
+      const reusing = next.some((it) => rows.has(it.id));
+      if (!reusing) {
+        // nothing to preserve — a human appends in document order
+        for (const it of next) ul.append(build(it).li);
+      } else {
+        // reordering — a human walks backwards with one moving reference
+        let ref = null;
+        for (let i = next.length - 1; i >= 0; i--) {
+          const row = rows.get(next[i].id) ?? build(next[i]);
+          if (row.li.parentNode !== ul || row.li.nextSibling !== ref) {
+            ul.insertBefore(row.li, ref);
+          }
+          ref = row.li;
         }
-        ref = row.li;
       }
       current = next.slice();
     },

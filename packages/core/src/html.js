@@ -50,8 +50,15 @@ export function html(strings, ...values) {
 
   const frag = /** @type {DocumentFragment} */ (compiled.tpl.content.cloneNode(true));
 
-  for (const b of compiled.bindings) {
-    const node = resolvePath(frag, b.path);
+  /* Resolve every target BEFORE binding anything: a child hole can replace its
+     one placeholder with several nodes, which shifts the child indexes of
+     every later sibling. Compiled output resolves up front for exactly this
+     reason — doing it here is what keeps the two modes identical. */
+  const nodes = compiled.bindings.map((b) => resolvePath(frag, b.path));
+
+  for (let i = 0; i < compiled.bindings.length; i++) {
+    const b = compiled.bindings[i];
+    const node = nodes[i];
     if (b.kind === 'child') {
       bindChild(/** @type {Text} */ (node), values[b.index]);
     } else if (b.kind === 'event') {
@@ -91,6 +98,13 @@ function compile(strings) {
     name: f.name,
     path: pathOf(f.node, tpl.content),
   }));
+
+  /* Children first. An element's live properties must be set AFTER its
+     children exist — `<select value=${x}>` cannot select an <option> that has
+     not been inserted yet — and that is also the order a human writes:
+     build the subtree, then set the property. Sort is stable, so document
+     order is preserved within each group. */
+  bindings.sort((a, b) => (a.kind === 'child' ? 0 : 1) - (b.kind === 'child' ? 0 : 1));
 
   return { tpl, bindings };
 }
