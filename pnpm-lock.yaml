@@ -44,9 +44,15 @@ importers:
       '@amojs/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@amojs/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/compiler:
     dependencies:
+      '@amojs/core':
+        specifier: workspace:*
+        version: link:../core
       acorn:
         specifier: ^8.18.0
         version: 8.18.0

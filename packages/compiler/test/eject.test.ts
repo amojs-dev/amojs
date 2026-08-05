@@ -12,7 +12,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { ejectDir } from '../src/eject.js';
+import { ejectDir, RUNTIME_FILES } from '../src/eject.js';
 
 const HERE = import.meta.url.startsWith('file:')
   ? dirname(fileURLToPath(import.meta.url))
@@ -84,4 +84,52 @@ test('eject: output has zero @amojs imports and RUNS without the package', async
   push();
   mod.flushSync();
   expect([...el.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['1', '2', '3']);
+});
+
+test('eject hands over the PROJECT\'s installed @amojs/core, not the compiler\'s', async () => {
+  // the npm scenario: a project with its own node_modules/@amojs/core. Its
+  // copy must win, so the ejected runtime is the version the code was
+  // written against. Marker content proves WHICH copy was handed over.
+  await write('npmproj/src/app.js', "import { signal } from '@amojs/core';\nexport const s = signal(1);");
+  await write(
+    'npmproj/node_modules/@amojs/core/package.json',
+    JSON.stringify({
+      name: '@amojs/core',
+      version: '9.9.9-fake',
+      type: 'module',
+      exports: {
+        '.': './src/index.js',
+        './runtime': './src/runtime.js',
+        './compiled': './src/compiled.js',
+      },
+    }),
+  );
+  for (const f of RUNTIME_FILES) {
+    await write(`npmproj/node_modules/@amojs/core/src/${f}`, `/* installed copy: ${f} */\n`);
+  }
+
+  const res = await ejectDir(join(TMP, 'npmproj'), join(TMP, 'dist-npm'));
+
+  expect(res.runtimeFrom).toBe(join(TMP, 'npmproj/node_modules/@amojs/core/src'));
+  const signalJs = await readFile(join(TMP, 'dist-npm/amo-runtime/signal.js'), 'utf8');
+  expect(signalJs).toContain('installed copy: signal.js');
+});
+
+test('eject fails loudly when a runtime file is missing', async () => {
+  await write('brokenproj/src/app.js', 'export const n = 1;');
+  await write(
+    'brokenproj/node_modules/@amojs/core/package.json',
+    JSON.stringify({ name: '@amojs/core', version: '0.0.0', type: 'module', exports: { '.': './src/index.js' } }),
+  );
+  await write('brokenproj/node_modules/@amojs/core/src/index.js', '// only this one exists\n');
+
+  await expect(
+    ejectDir(join(TMP, 'brokenproj'), join(TMP, 'dist-broken')),
+  ).rejects.toThrow(/cannot read the runtime file .*signal\.js/);
+});
+
+test('RUNTIME_FILES covers every file @amojs/core ships (drift guard)', async () => {
+  const coreSrc = join(HERE, '../../core/src');
+  const shipped = (await readdir(coreSrc)).filter((f) => extname(f) === '.js');
+  expect([...RUNTIME_FILES].sort()).toEqual(shipped.sort());
 });

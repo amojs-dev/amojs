@@ -1,6 +1,6 @@
 {
   "name": "@amojs/compiler",
-  "version": "0.6.0-dev",
+  "version": "0.6.1-dev",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "dist"
   ],
   "dependencies": {
+    "@amojs/core": "workspace:*",
     "acorn": "^8.18.0"
   }
 }

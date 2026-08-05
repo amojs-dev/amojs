@@ -94,6 +94,7 @@ async function main(argv: string[]): Promise<void> {
     process.stdout.write(
       `amo eject — ${r.compiled.length} compiled, ${r.copied.length} copied, ` +
         `${r.runtime.length} runtime files → ${outArg} (runtime: ${runtimeDir ?? 'amo-runtime'}/)\n` +
+        `runtime taken from ${r.runtimeFrom}\n` +
         'no bare "@amojs" imports remain — deleting amo changes nothing.\n',
     );
   }

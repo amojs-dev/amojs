@@ -70,8 +70,10 @@ test('amo eject: output through the real binary has zero bare @amojs imports', a
   expect(stdout).toContain('amo eject —');
   expect(stdout).toContain('runtime: amo-runtime/');
 
+  // the ejected index is core's public surface, copied verbatim
   const runtimeIndex = await readFile(join(TMP, 'dist-eject/amo-runtime/index.js'), 'utf8');
-  expect(runtimeIndex).toContain('ejected copy');
+  expect(runtimeIndex).toContain("export { html } from './html.js';");
+  expect(stdout).toContain('runtime taken from ');
 
   const app = await readFile(join(TMP, 'dist-eject/src/app.js'), 'utf8');
   expect(app).not.toMatch(/from\s+['"]@amojs/);
