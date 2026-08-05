@@ -31,7 +31,7 @@ import { isSignal, root, onDispose } from './signal.js';
  */
 export function each(source, key, render) {
   if (!isSignal(source) && typeof source !== 'function') {
-    throw new Error('amo: each() source must be a signal or a function');
+    throw new Error('amo: each() source must be signal or function');
   }
   const read = isSignal(source)
     ? () => /** @type {{value: any[]}} */ (source).value
@@ -65,7 +65,7 @@ export function each(source, key, render) {
         entry = root((dispose) => ({ node: render(item, i), dispose }));
         if (entry.node.nodeType === 11) {
           entry.dispose();
-          throw new Error('amo: each() render must return a single element, not a fragment');
+          throw new Error('amo: each() render must return one element');
         }
       }
       next.set(k, entry);

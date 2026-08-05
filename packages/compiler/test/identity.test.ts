@@ -10,8 +10,10 @@
  */
 import { test, expect, afterAll } from 'vitest';
 import { gzipSync } from 'node:zlib';
+import { mkdir } from 'node:fs/promises';
+import { build } from 'esbuild';
 import { compileModule } from '../src/codegen.js';
-import { load, cleanupFixtures } from './harness.js';
+import { load, cleanupFixtures, resolveSpecifiers, TMP } from './harness.js';
 
 afterAll(cleanupFixtures);
 
@@ -25,10 +27,11 @@ const FIXTURE = [
   '}',
 ].join('\n');
 
-/* the reference: what a disciplined human writes for the same behavior */
+/* the reference: what a disciplined human writes for the same behavior —
+   including importing the parser-free entry, exactly like compiled output */
 const REFERENCE = [
-  "import { signal, computed, effect } from '@amojs/core';",
-  "export { flushSync } from '@amojs/core';",
+  "import { signal, computed, effect } from '@amojs/core/runtime';",
+  "export { flushSync } from '@amojs/core/runtime';",
   'export function Counter() {',
   '  const count = signal(0);',
   '  const double = computed(() => count.value * 2);',
@@ -84,8 +87,29 @@ test('identity: compiled output is ≤ +10% of the hand-written reference (gzip)
   expect(ratio).toBeLessThanOrEqual(1.1);
 });
 
+test('the whole compiled counter app — runtime included — bundles to ≤ 2KB min+gz', async () => {
+  // THE 2KB PROMISE: not the module alone — the app plus everything it pulls
+  // in, bundled/minified/gzipped. This is the number frameworks quote
+  // (a Svelte 5 hello-world lands around 4-6KB on the same metric).
+  await mkdir(TMP, { recursive: true });
+  const compiled = resolveSpecifiers(compileModule(FIXTURE), TMP);
+  const r = await build({
+    stdin: { contents: compiled, resolveDir: TMP, loader: 'js' },
+    bundle: true,
+    minify: true,
+    format: 'esm',
+    write: false,
+  });
+  const bytes = gzipSync(Buffer.from(r.outputFiles[0].contents), { level: 9 }).length;
+  console.log(`[identity] compiled counter app, all-in: ${bytes} B min+gz (budget 2048)`);
+  expect(bytes).toBeLessThanOrEqual(2048);
+});
+
 test('identity side-effect: compiled module no longer imports the template parser', () => {
   const compiled = compileModule(FIXTURE);
-  expect(compiled).toContain("import { signal, computed } from '@amojs/core';");
+  // parser-free imports point at the /runtime entry — the package root would
+  // statically pull html.js in, and raw ESM has no tree-shaking
+  expect(compiled).toContain("import { signal, computed } from '@amojs/core/runtime';");
+  expect(compiled).toContain("export { flushSync } from '@amojs/core/runtime';");
   expect(compiled).not.toMatch(/\bhtml\b/);
 });

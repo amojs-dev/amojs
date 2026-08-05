@@ -1,11 +1,12 @@
 {
   "name": "@amojs/core",
-  "version": "0.5.0-dev",
+  "version": "0.6.0-dev",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS reactive core — signals, html`` templates, mount. Zero dependencies; runs raw in the browser.",
   "exports": {
     ".": "./src/index.js",
+    "./runtime": "./src/runtime.js",
     "./compiled": "./src/compiled.js"
   },
   "engines": {

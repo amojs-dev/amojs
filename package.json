@@ -9,12 +9,14 @@
   "scripts": {
     "build": "pnpm -r run build",
     "amo": "node packages/cli/dist/main.js",
+    "bench": "vitest bench --run",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm build && tsc -p ."
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
     "happy-dom": "^20.11.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

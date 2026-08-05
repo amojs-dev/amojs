@@ -83,7 +83,7 @@ async function runList(src: string) {
 test('GOLDEN keyed list: raw and compiled behave identically', async () => {
   const compiled = compileModule(LIST);
   expect(compiled).not.toContain('html`');
-  expect(compiled).toContain("import { signal, each } from '@amojs/core';"); // html stripped, each kept
+  expect(compiled).toContain("import { signal, each } from '@amojs/core/runtime';"); // html stripped, each kept, parser-free entry
   const raw = await runList(LIST);
   const cmp = await runList(compiled);
   expect(cmp).toEqual(raw);

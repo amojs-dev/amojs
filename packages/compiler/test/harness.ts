@@ -21,17 +21,22 @@ const TMP = join(HERE, '__tmp__', randomUUID());
 const CORE_SRC = join(HERE, '../../core/src');
 
 /** rewrite bare @amojs specifiers to paths relative to the fixture's dir */
-function resolveSpecifiers(src: string, fromDir: string): string {
+export function resolveSpecifiers(src: string, fromDir: string): string {
   const rel = (file: string): string =>
     relative(fromDir, join(CORE_SRC, file)).split('\\').join('/');
   const core = rel('index.js');
+  const runtime = rel('runtime.js');
   const helpers = rel('compiled.js');
   return src
     .replaceAll('"@amojs/core/compiled"', `"${helpers}"`)
     .replaceAll("'@amojs/core/compiled'", `'${helpers}'`)
+    .replaceAll('"@amojs/core/runtime"', `"${runtime}"`)
+    .replaceAll("'@amojs/core/runtime'", `'${runtime}'`)
     .replaceAll('"@amojs/core"', `"${core}"`)
     .replaceAll("'@amojs/core'", `'${core}'`);
 }
+
+export { TMP };
 
 export async function load(src: string): Promise<Record<string, any>> {
   await mkdir(TMP, { recursive: true });

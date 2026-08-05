@@ -67,9 +67,9 @@ test('eject: output has zero @amojs imports and RUNS without the package', async
     expect(src).not.toMatch(/import\s*\(\s*['"]@amojs/);
   }
 
-  // specifiers point at the local runtime
+  // specifiers point at the local runtime (parser-free entry for compiled code)
   const app = await readFile(join(TMP, 'dist/src/app.js'), 'utf8');
-  expect(app).toContain("'../amo-runtime/index.js'");
+  expect(app).toContain("'../amo-runtime/runtime.js'");
   expect(app).toContain('"../amo-runtime/compiled.js"');
 
   // and the ejected app actually runs — the ultimate uninstall proof

@@ -106,6 +106,10 @@ export function compileModule(source: string): string {
       const keep: AnyNode[] = coreImport.specifiers.filter(
         (s: AnyNode) => !removable.includes(s),
       );
+      // parser-free import → the '/runtime' entry: raw ESM has no
+      // tree-shaking, and the package root statically pulls html.js in
+      const keepsHtml = keep.some((s: AnyNode) => s.imported.name === 'html');
+      const source = keepsHtml ? '@amojs/core' : '@amojs/core/runtime';
       const text = keep.length
         ? `import { ${keep
             .map((s) =>
@@ -113,13 +117,41 @@ export function compileModule(source: string): string {
                 ? s.local.name
                 : `${s.imported.name} as ${s.local.name}`,
             )
-            .join(', ')} } from '@amojs/core';`
+            .join(', ')} } from '${source}';`
         : '';
       const ms = map(coreImport.start);
       const me = map(coreImport.end);
       src = src.slice(0, ms) + text + src.slice(me);
       edits.push({ origEnd: coreImport.end, delta: text.length - (me - ms) });
     }
+  }
+
+  // retarget every OTHER parser-free '@amojs/core' import / re-export to
+  // '@amojs/core/runtime' as well (e.g. `export { flushSync } from …`) —
+  // one html-free specifier list means the module never needs the parser
+  const RUNTIME_SPEC = `'@amojs/core/runtime'`;
+  for (const node of ast.body) {
+    const decl = node as unknown as AnyNode;
+    if (decl === coreImport) continue; // handled (or deliberately kept) above
+    let touchesHtml: boolean;
+    if (node.type === 'ImportDeclaration' && decl.source.value === '@amojs/core') {
+      touchesHtml = decl.specifiers.some(
+        (s: AnyNode) => s.type !== 'ImportSpecifier' || s.imported.name === 'html',
+      );
+    } else if (
+      node.type === 'ExportNamedDeclaration' &&
+      decl.source &&
+      decl.source.value === '@amojs/core'
+    ) {
+      touchesHtml = decl.specifiers.some((s: AnyNode) => s.local.name === 'html');
+    } else {
+      continue; // `export * from` would re-export html — left untouched
+    }
+    if (touchesHtml) continue;
+    const ms = map(decl.source.start);
+    const me = map(decl.source.end);
+    src = src.slice(0, ms) + RUNTIME_SPEC + src.slice(me);
+    edits.push({ origEnd: decl.source.end, delta: RUNTIME_SPEC.length - (me - ms) });
   }
 
   const names = ['tpl as _$t'];

@@ -93,11 +93,8 @@ function normalizeNodes(v) {
  * @returns {Node}
  */
 function assertNode(n) {
-  if (!(n instanceof Node)) {
-    throw new Error('amo: array holes must contain DOM nodes only');
-  }
-  if (n.nodeType === 11) {
-    throw new Error('amo: array holes cannot contain fragments — use single-root templates');
+  if (!(n instanceof Node) || n.nodeType === 11) {
+    throw new Error('amo: array holes take non-fragment nodes only');
   }
   return n;
 }

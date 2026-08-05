@@ -31,7 +31,7 @@ const CLEAN = 0;
 const MAYBE_DIRTY = 1;
 const DIRTY = 2;
 
-const UNSET = Symbol('amo.unset');
+const UNSET = Symbol();
 
 export class Signal {
   /** @param {*} value */
@@ -99,7 +99,7 @@ class Effect {
   /** @param {() => *} fn */
   constructor(fn) {
     if (activeReaction instanceof Computed) {
-      throw new Error('amo: an effect cannot be created inside computed() — computeds must stay pure');
+      throw new Error('amo: no effect() inside computed()');
     }
     /** the user function (module-internal, not public API) */
     this._fn = fn;
@@ -247,23 +247,25 @@ function mark(r, state) {
 /* pull phase: recompute only with proof                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Investigate a MAYBE_DIRTY reaction: refresh its computed deps, then ask
+ * whether any dep has actually written since our last run.
+ * @param {Computed | Effect} r
+ */
+function stale(r) {
+  for (const d of r.deps) {
+    if (d instanceof Computed) refresh(d);
+    if (d.wv > r.lastWv) return true;
+  }
+  return false;
+}
+
 /** @param {Computed} c */
 function refresh(c) {
   if (c.state === CLEAN) return;
-  if (c.state === MAYBE_DIRTY && c._v !== UNSET) {
-    // investigate: refresh own deps first, then compare write versions
-    let stale = false;
-    for (const d of c.deps) {
-      if (d instanceof Computed) refresh(d);
-      if (d.wv > c.lastWv) {
-        stale = true;
-        break;
-      }
-    }
-    if (!stale) {
-      c.state = CLEAN; // proven clean — no recompute, no downstream wake
-      return;
-    }
+  if (c.state === MAYBE_DIRTY && c._v !== UNSET && !stale(c)) {
+    c.state = CLEAN; // proven clean — no recompute, no downstream wake
+    return;
   }
   const next = runWith(c, c._fn);
   c.lastWv = writeVersion;
@@ -278,20 +280,9 @@ function refresh(c) {
 /** @param {Effect} e */
 function runEffect(e) {
   if (e.disposed) return;
-  if (e.state === MAYBE_DIRTY) {
-    // woke up from the queue — but is anything actually newer?
-    let stale = false;
-    for (const d of e.deps) {
-      if (d instanceof Computed) refresh(d);
-      if (d.wv > e.lastWv) {
-        stale = true;
-        break;
-      }
-    }
-    if (!stale) {
-      e.state = CLEAN; // nothing to do — go back to sleep, zero DOM work
-      return;
-    }
+  if (e.state === MAYBE_DIRTY && !stale(e)) {
+    e.state = CLEAN; // woke up, proved itself clean — zero DOM work
+    return;
   }
   teardown(e); // last run's children and cleanups die before the new run
   runWith(e, e._fn);
@@ -404,7 +395,7 @@ export function root(fn) {
  */
 export function onCleanup(fn) {
   if (!activeOwner) {
-    throw new Error('amo: onCleanup() called outside a reactive scope');
+    throw new Error('amo: onCleanup() outside a scope');
   }
   (activeOwner.cleanups ??= []).push(fn);
 }

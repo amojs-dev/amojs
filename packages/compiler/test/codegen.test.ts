@@ -24,7 +24,10 @@ test('compiles the counter: hoisted template, walks, bindings — no html`` left
   expect(out).toContain('.addEventListener("click", () => count.value++)');
   expect(out).toContain('_$child(');
   // helper import + hoisted template land AFTER the original imports
-  expect(out.indexOf('@amojs/core/compiled')).toBeGreaterThan(out.indexOf("'@amojs/core'"));
+  expect(out.indexOf('@amojs/core/compiled')).toBeGreaterThan(
+    out.indexOf("'@amojs/core/runtime'"),
+  );
+  expect(out.indexOf("'@amojs/core/runtime'")).toBeGreaterThan(-1);
 });
 
 test('unwrap decision is static: single-root template roots the walks at the element', () => {

@@ -4,10 +4,10 @@
  * Node identity IS the key: keying strategies live upstream in each() —
  * exactly the dom-expressions lesson (reconcile nodes, key in the mapper).
  *
- * Correct-first version: skip the common prefix and suffix, remove leavers,
- * then re-insert the middle in order (insertBefore moves nodes that already
- * live in the parent). An LIS-optimal diff that minimizes moves is a v0.6
- * (size & speed) concern — the behavior contract is fixed here.
+ * Move-minimal (v0.6): skip the common prefix and suffix, remove leavers,
+ * then keep every node on the longest increasing subsequence of old
+ * positions anchored and insert only the rest. A swap costs 2 moves, a
+ * reverse costs n−1 — the counts a careful human would produce by hand.
  */
 
 /**
@@ -34,18 +34,66 @@ export function reconcile(parent, prev, next, anchor) {
     bEnd--;
   }
 
-  // remove nodes that leave
-  const keep = new Set(next.slice(bStart, bEnd));
+  // one map does double duty: membership (who stays) and old position
+  /** @type {Map<Node, number>} new-middle node → old position (-1 = new) */
+  const pos = new Map();
+  for (let i = bStart; i < bEnd; i++) pos.set(next[i], -1);
   for (let i = aStart; i < aEnd; i++) {
-    if (!keep.has(prev[i])) parent.removeChild(prev[i]);
+    if (pos.has(prev[i])) pos.set(prev[i], i);
+    else parent.removeChild(prev[i]);
   }
 
-  // (re)insert the middle in order, walking backwards toward the suffix —
-  // skipping nodes that already sit in place, so they are not "moved" for free
+  // nodes whose old positions form the longest increasing subsequence are
+  // already in relative order — anchor on them, move only the rest
+  const stable = lis(next, bStart, bEnd, pos);
+
   let ref = aEnd < prev.length ? prev[aEnd] : anchor;
   for (let i = bEnd - 1; i >= bStart; i--) {
     const n = next[i];
-    if (n.parentNode !== parent || n.nextSibling !== ref) parent.insertBefore(n, ref);
+    if (!stable.has(n)) parent.insertBefore(n, ref);
     ref = n;
   }
+}
+
+/**
+ * The nodes on one longest strictly-increasing subsequence of old positions:
+ * patience sorting with predecessor links, O(n log n).
+ * @param {Node[]} next
+ * @param {number} bStart
+ * @param {number} bEnd
+ * @param {Map<Node, number>} pos
+ * @returns {Set<Node>}
+ */
+function lis(next, bStart, bEnd, pos) {
+  /** @type {Node[]} reused nodes in new order */
+  const nodes = [];
+  /** @type {number[]} their old positions */
+  const seq = [];
+  for (let i = bStart; i < bEnd; i++) {
+    const p = /** @type {number} */ (pos.get(next[i]));
+    if (p >= 0) {
+      nodes.push(next[i]);
+      seq.push(p);
+    }
+  }
+  /** @type {number[]} index of the smallest tail per subsequence length */
+  const tails = [];
+  /** @type {number[]} previous chain link per element */
+  const back = new Array(seq.length).fill(-1);
+  for (let i = 0; i < seq.length; i++) {
+    let lo = 0;
+    let hi = tails.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (seq[tails[mid]] < seq[i]) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo > 0) back[i] = tails[lo - 1];
+    tails[lo] = i;
+  }
+  const stable = new Set();
+  for (let k = tails.length ? tails[tails.length - 1] : -1; k !== -1; k = back[k]) {
+    stable.add(nodes[k]);
+  }
+  return stable;
 }

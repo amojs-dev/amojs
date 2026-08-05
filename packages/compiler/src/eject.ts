@@ -27,6 +27,7 @@ const RUNTIME_FILES = [
   'compiled.js',
   'html.js',
   'mount.js',
+  'runtime.js',
 ];
 
 const RUNTIME_INDEX = `/**
@@ -82,6 +83,8 @@ export async function ejectDir(
     const out = source
       .replaceAll('"@amojs/core/compiled"', `"${prefix}/compiled.js"`)
       .replaceAll("'@amojs/core/compiled'", `'${prefix}/compiled.js'`)
+      .replaceAll('"@amojs/core/runtime"', `"${prefix}/runtime.js"`)
+      .replaceAll("'@amojs/core/runtime'", `'${prefix}/runtime.js'`)
       .replaceAll('"@amojs/core"', `"${prefix}/index.js"`)
       .replaceAll("'@amojs/core'", `'${prefix}/index.js'`);
     if (out !== source) await writeFile(file, out);

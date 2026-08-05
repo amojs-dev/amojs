@@ -68,7 +68,7 @@ test('onCleanup runs before every re-run and once more on dispose, children firs
 });
 
 test('onCleanup outside any scope throws', () => {
-  expect(() => onCleanup(() => {})).toThrow(/outside a reactive scope/);
+  expect(() => onCleanup(() => {})).toThrow(/outside a scope/);
 });
 
 test('creating an effect inside computed() throws — computeds stay pure', () => {
