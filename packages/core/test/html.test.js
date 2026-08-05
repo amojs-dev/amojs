@@ -83,3 +83,27 @@ test('digits and Persian text in static content are not mistaken for markers', (
   const el = /** @type {Element} */ (html`<p>1404 و ۲۵</p>`);
   expect(el.textContent).toBe('1404 و ۲۵');
 });
+
+test('a re-running text hole skips the DOM write when the string is unchanged', () => {
+  const n = signal(0);
+  const el = /** @type {Element} */ (html`<p>${() => (n.value, 'ثابت')}</p>`);
+  mount(el, document.body);
+  const mo = new MutationObserver(() => {});
+  mo.observe(el, { characterData: true, subtree: true });
+  n.value = 1; // effect re-runs — output identical
+  flushSync();
+  expect(mo.takeRecords()).toHaveLength(0);
+  mo.disconnect();
+});
+
+test('a re-running attr hole skips the DOM write when the value is unchanged', () => {
+  const n = signal(0);
+  const el = /** @type {Element} */ (html`<p class=${() => (n.value, 'same')}>t</p>`);
+  mount(el, document.body);
+  const mo = new MutationObserver(() => {});
+  mo.observe(el, { attributes: true });
+  n.value = 1;
+  flushSync();
+  expect(mo.takeRecords()).toHaveLength(0);
+  mo.disconnect();
+});

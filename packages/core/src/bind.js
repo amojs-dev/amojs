@@ -73,7 +73,8 @@ function reactiveChild(anchor, read) {
         block = [];
         textMode = true;
       }
-      anchor.data = asText(v);
+      const t = asText(v);
+      if (anchor.data !== t) anchor.data = t; // cutoff at the DOM boundary too
     }
   });
 }
@@ -104,6 +105,8 @@ function assertNode(n) {
 /**
  * Bind a value to an attribute (a full-value attr hole).
  * null/undefined/false remove the attribute; true sets it empty.
+ * Writes are skipped when the DOM already holds the same value — an effect
+ * re-running must never cause DOM work its result doesn't require.
  * @param {Element} el
  * @param {string} name
  * @param {*} v
@@ -111,9 +114,12 @@ function assertNode(n) {
 export function bindAttr(el, name, v) {
   /** @param {*} val */
   const apply = (val) => {
-    if (val == null || val === false) el.removeAttribute(name);
-    else if (val === true) el.setAttribute(name, '');
-    else el.setAttribute(name, String(val));
+    if (val == null || val === false) {
+      if (el.hasAttribute(name)) el.removeAttribute(name);
+    } else {
+      const s = val === true ? '' : String(val);
+      if (el.getAttribute(name) !== s) el.setAttribute(name, s);
+    }
   };
   if (isSignal(v)) effect(() => apply(v.value));
   else if (typeof v === 'function') effect(() => apply(v()));
