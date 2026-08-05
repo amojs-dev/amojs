@@ -8,5 +8,6 @@
  */
 
 export { signal, computed, effect, isSignal, flushSync, tick } from './signal.js';
-export { html, mount } from './html.js';
+export { html } from './html.js';
+export { mount } from './mount.js';
 export { each } from './each.js';

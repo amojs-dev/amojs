@@ -64,18 +64,6 @@ export function html(strings, ...values) {
   return unwrap(frag, compiled);
 }
 
-/**
- * Instantiate a component (or take a node) and append it to a target.
- * Component functions run ONCE — after mount, only hole effects stay alive.
- * @param {(() => Node) | Node} component
- * @param {Element} target
- */
-export function mount(component, target) {
-  const node = typeof component === 'function' ? component() : component;
-  target.append(node);
-  return node;
-}
-
 /* ------------------------------------------------------------------ */
 /* compile: template string → <template> + positional bindings         */
 /* ------------------------------------------------------------------ */

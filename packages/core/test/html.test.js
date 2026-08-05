@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { test, expect } from 'vitest';
 import { signal, flushSync } from '../src/signal.js';
-import { html, mount } from '../src/html.js';
+import { html } from '../src/html.js';
+import { mount } from '../src/mount.js';
 
 test('static template returns a real element', () => {
   const el = /** @type {Element} */ (html`<p class="a">hello</p>`);

@@ -1,7 +1,7 @@
 /**
  * amo runtime — helpers for COMPILED output only.
  *
- * Generated code imports from '@amojs/core/compiled'. This module never
+ * Generated code imports the '@amojs/core/compiled' entry. This module never
  * touches the template parser: a fully compiled app ships signal.js +
  * bind.js + this file — nothing else. That missing parser IS the size win.
  */

@@ -12,3 +12,5 @@ export * from './ir.js';
 export * from './detect.js';
 export * from './template.js';
 export * from './codegen.js';
+export * from './build.js';
+export * from './eject.js';
