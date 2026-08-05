@@ -40,10 +40,12 @@ export function reconcile(parent, prev, next, anchor) {
     if (!keep.has(prev[i])) parent.removeChild(prev[i]);
   }
 
-  // (re)insert the middle in order, walking backwards toward the suffix
+  // (re)insert the middle in order, walking backwards toward the suffix —
+  // skipping nodes that already sit in place, so they are not "moved" for free
   let ref = aEnd < prev.length ? prev[aEnd] : anchor;
   for (let i = bEnd - 1; i >= bStart; i--) {
-    parent.insertBefore(next[i], ref);
-    ref = next[i];
+    const n = next[i];
+    if (n.parentNode !== parent || n.nextSibling !== ref) parent.insertBefore(n, ref);
+    ref = n;
   }
 }
