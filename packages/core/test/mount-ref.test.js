@@ -9,7 +9,7 @@
  */
 import { test, expect, vi } from 'vitest';
 import {
-  signal, effect, flushSync, root, onMount, html, mount, each,
+  signal, effect, flushSync, root, onMount, onCleanup, html, mount, each,
 } from '../src/index.js';
 
 /* ---------------- ref ---------------- */
@@ -155,6 +155,35 @@ test('a callback queued by onMount runs in the same drain', () => {
   }
   mount(Comp, document.body);
   expect(order).toEqual(['first', 'nested']);
+});
+
+test('onCleanup inside an each row fires when its key leaves', () => {
+  // the real usage-amo/todo pattern: a component registers its node in a Set
+  // and the ownership tree takes it out again — no querySelector, no manual
+  // bookkeeping.
+  /** @type {Set<Element>} */
+  const rows = new Set();
+  const items = signal([1, 2, 3]);
+  const el = /** @type {Element} */ (
+    html`<ul>${each(items, (k) => k, (k) => {
+      const li = /** @type {Element} */ (html`<li>${String(k)}</li>`);
+      rows.add(li);
+      onCleanup(() => rows.delete(li));
+      return li;
+    })}</ul>`
+  );
+  mount(el, document.body);
+  expect(rows.size).toBe(3);
+  expect([...rows]).toEqual([...el.children]);
+
+  items.value = [3, 1]; // one key leaves
+  flushSync();
+  expect(rows.size).toBe(2);
+  expect(new Set([...rows])).toEqual(new Set([...el.children]));
+
+  items.value = []; // all leave
+  flushSync();
+  expect(rows.size).toBe(0);
 });
 
 /* ---------------- error isolation ---------------- */

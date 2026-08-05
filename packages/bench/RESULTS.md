@@ -79,6 +79,59 @@ per-binding) does this. Filed as a compiler-optimization candidate for a
 later milestone; magnitudes are tens-of-percent on JS bookkeeping, so it
 ranks below correctness and size work.
 
+## AmoJS vs Lit — the closest existing library
+
+Lit deserves its own section because it is the nearest neighbour, not a distant
+competitor: `html` tagged templates, zero dependencies, no build step required,
+template cached once and cloned per instance with positional paths to the
+dynamic parts. **The same technique.** The difference is the update model, and
+that is what these numbers isolate. Enforced by `lit.test.ts` and
+`lit-size.test.ts` (Lit 3.3.3).
+
+**Fairness:** Lit is measured through bare `html` + `render` — its *smallest*
+configuration, no LitElement, no decorators, no custom element, no shadow DOM.
+Anything more only adds bytes on Lit's side. Stated rather than hidden: bare
+lit-html needs a manual `render()` per update, while an AmoJS signal write
+updates by itself; LitElement automates that and costs more.
+
+### Expression evaluations per update — a card with five text bindings
+
+| scenario | AmoJS | Lit | DOM mutations |
+|---|---|---|---|
+| **1 of 5 bindings changes** | **1** | 5 | 1 vs 1 |
+| 5 of 5 bindings change | 5 | 5 | 5 vs 5 |
+| churn — same values rewritten | **0** | 5 | 0 vs 0 |
+
+**Reading it honestly.** Row 1 is the architectural win: Lit re-runs the whole
+template function and dirty-checks every Part, so all five expressions are
+recomputed to discover that four did not change. AmoJS wakes exactly the one
+effect whose signal moved; the other four are never evaluated. Row 3 is the
+same story at the source — an equal write in AmoJS wakes nobody at all.
+
+**Row 2 is where fine-grained granularity buys nothing** — both do five
+evaluations and five DOM writes, and Lit reaches that in one pass while AmoJS
+pays for five effect wakeups. This mirrors the grouping result above. Also
+worth saying plainly: Lit's per-Part comparison is genuinely good — the DOM
+mutation column is a tie in every row. Neither library does wasted DOM work.
+
+### Shipped bytes — the same app, bundled + minified + gzipped
+
+The app: a card with five dynamic bindings, an event listener, and a keyed list
+(`each` vs Lit's `repeat` directive), runtime included.
+
+| | min+gz |
+|---|---|
+| **AmoJS (compiled)** | **2,336 B** |
+| Lit (bare, smallest config) | 6,890 B |
+
+**Lit is 2.95× larger for the same app** — and that is Lit at its smallest.
+
+### What these numbers do NOT measure
+
+Ecosystem, SSR, tooling maturity, browser-vendor buy-in, and five years of
+production hardening — all of which Lit has and AmoJS does not. Being
+technically distinct is not the same as winning adoption.
+
 ## Size gates (enforced in CI, `core/test/size.test.js` + identity benchmark)
 
 | gate | measured | budget |

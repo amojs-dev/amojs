@@ -1,6 +1,6 @@
 {
   "name": "@amojs/bench",
-  "version": "0.6.0-dev",
+  "version": "0.6.1-dev",
   "private": true,
   "type": "module",
   "description": "AmoJS micro-benchmarks — never published. Competitor libraries live here so the runtime keeps zero dependencies.",
@@ -8,9 +8,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@amojs/compiler": "workspace:*",
     "@amojs/core": "workspace:*",
     "@vue/reactivity": "3.6.0-rc.2",
     "alien-signals": "^3.2.0",
+    "lit": "^3.3.3",
     "solid-js": "^1.9.0"
   }
 }
