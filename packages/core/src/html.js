@@ -16,7 +16,7 @@
  * delegation will be an explicit opt-in, never a default).
  */
 
-import { bindChild, bindAttr } from './bind.js';
+import { bindChild, bindAttr, bindEvent } from './bind.js';
 
 /* Hole markers use unicode private-use codepoints: they survive HTML parsing
    in both text and attribute positions and cannot collide with real content.
@@ -62,7 +62,7 @@ export function html(strings, ...values) {
     if (b.kind === 'child') {
       bindChild(/** @type {Text} */ (node), values[b.index]);
     } else if (b.kind === 'event') {
-      node.addEventListener(b.name, values[b.index]);
+      bindEvent(/** @type {Element} */ (node), b.name, values[b.index]);
     } else {
       bindAttr(/** @type {Element} */ (node), b.name, values[b.index]);
     }

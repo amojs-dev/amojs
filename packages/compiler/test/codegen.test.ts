@@ -21,7 +21,7 @@ test('compiles the counter: hoisted template, walks, bindings — no html`` left
   expect(out).toContain('from "@amojs/core/compiled"');
   expect(out).toContain('c:<!---->|<!----></button>'); // static html + hole markers
   expect(out).toContain('[[0,1],[0,3]]'); // placeholder paths
-  expect(out).toContain('.addEventListener("click", () => count.value++)');
+  expect(out).toContain('_$event(_r, "click", () => count.value++)');
   expect(out).toContain('_$child(');
   // helper import + hoisted template land AFTER the original imports
   expect(out.indexOf('@amojs/core/compiled')).toBeGreaterThan(

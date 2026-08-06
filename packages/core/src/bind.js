@@ -100,6 +100,25 @@ function toNodes(v) {
 }
 
 /**
+ * Attach an `on*` hole's listener.
+ *
+ * A listener must be a FUNCTION. Every other hole position accepts a signal,
+ * so handing one to `onclick=${…}` is the natural mistake — and passing a
+ * non-callable to addEventListener fails in total silence, forever. One
+ * explicit throw is worth more than a listener that never runs.
+ *
+ * @param {Element} el
+ * @param {string} name  event name without the `on` prefix
+ * @param {*} v
+ */
+export function bindEvent(el, name, v) {
+  if (typeof v !== 'function') {
+    throw new Error(`amo: on${name} needs a function, not a ${isSignal(v) ? 'signal' : typeof v}`);
+  }
+  el.addEventListener(name, v);
+}
+
+/**
  * Bind a value to an attribute (a full-value attr hole).
  * null/undefined/false remove the attribute; true sets it empty.
  * Writes are skipped when the DOM already holds the same value — an effect

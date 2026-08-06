@@ -117,6 +117,86 @@ test('singleRootIndex: null for multiple roots or root-level text', () => {
   expect(parseTemplate(['  <p>t</p> ']).singleRootIndex).toBe(1);
 });
 
+/* ---------------- foreign content (svg / math) ---------------- */
+
+test('svg self-closes any element — the way SVG is actually written', () => {
+  const ir = parseTemplate(['<svg><circle r="5"/><rect/></svg>']);
+  // the "/" MUST survive into the emitted markup: without it the reparse
+  // would open <circle> and swallow <rect>, shifting every later NodePath
+  expect(ir.html).toBe('<svg><circle r="5"/><rect/></svg>');
+  expect(ir.singleRootIndex).toBe(0);
+});
+
+test('svg keeps name casing — SVG attributes are case-sensitive', () => {
+  const ir = parseTemplate([
+    '<svg viewBox="0 0 1 1"><linearGradient gradientTransform="t"><stop/></linearGradient></svg>',
+  ]);
+  expect(ir.html).toBe(
+    '<svg viewBox="0 0 1 1"><linearGradient gradientTransform="t"><stop/></linearGradient></svg>',
+  );
+});
+
+test('an svg attr hole keeps its casing, an svg event hole is lowercased', () => {
+  expect(parseTemplate(['<svg><path pathLength=', ' onClick=', ' /></svg>']).holes).toEqual([
+    { kind: 'attr', expr: 0, name: 'pathLength', path: [0, 0] },
+    { kind: 'event', expr: 1, name: 'click', path: [0, 0] },
+  ]);
+});
+
+test('throws: an unquoted hole glued to "/>" — the browser mis-parses it', () => {
+  // Chrome folds the "/" into the value AND does not self-close, so the next
+  // sibling becomes a child. Raw mode rejects it; so must we (LOCKED RULE #3).
+  expect(() => parseTemplate(['<svg><circle r=', '/></svg>'])).toThrow(/cannot be followed by/);
+  expect(() => parseTemplate(['<img src=', '/>'])).toThrow(/cannot be followed by/);
+  // both spellings the error suggests do work
+  expect(parseTemplate(['<svg><circle r=', ' /></svg>']).html).toBe('<svg><circle/></svg>');
+  expect(parseTemplate(['<svg><circle r="', '"/></svg>']).html).toBe('<svg><circle/></svg>');
+});
+
+test('foreign content has no void elements: <svg><circle> still needs closing', () => {
+  expect(() => parseTemplate(['<svg><circle></svg>'])).toThrow(/unexpected <\/svg>/);
+  expect(parseTemplate(['<svg><circle></circle></svg>']).html).toBe(
+    '<svg><circle></circle></svg>',
+  );
+});
+
+test('inside svg, rawtext elements are ordinary — <title> is the a11y name', () => {
+  expect(parseTemplate(['<svg><title>Chart</title></svg>']).html).toBe(
+    '<svg><title>Chart</title></svg>',
+  );
+});
+
+test('holes and paths work inside svg', () => {
+  const ir = parseTemplate(['<svg><circle r="', '"/><text>', '</text></svg>']);
+  expect(ir.holes).toEqual([
+    { kind: 'attr', expr: 0, name: 'r', path: [0, 0] },
+    { kind: 'child', expr: 1, path: [0, 1, 0] },
+  ]);
+  expect(ir.html).toBe('<svg><circle/><text><!----></text></svg>');
+});
+
+test('svg nested in html, with siblings after it, keeps sibling paths right', () => {
+  const ir = parseTemplate(['<div><svg><use href="#a"/></svg><span>', '</span></div>']);
+  expect(ir.html).toBe('<div><svg><use href="#a"/></svg><span><!----></span></div>');
+  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1, 0] }]);
+});
+
+test('<math> is foreign content too', () => {
+  expect(parseTemplate(['<math><mi>x</mi><mspace/></math>']).html).toBe(
+    '<math><mi>x</mi><mspace/></math>',
+  );
+});
+
+test('HTML rules resume inside an integration point (foreignObject)', () => {
+  expect(parseTemplate(['<svg><foreignObject><div>x</div></foreignObject></svg>']).html).toBe(
+    '<svg><foreignObject><div>x</div></foreignObject></svg>',
+  );
+  // <div/> is still an error in there — foreignObject's children are HTML
+  expect(() =>
+    parseTemplate(['<svg><foreignObject><div/></foreignObject></svg>']),
+  ).toThrow(/self-closing/);
+});
+
 /* ---------------- strict-subset errors ---------------- */
 
 test('throws: partial quoted attribute value', () => {

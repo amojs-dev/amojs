@@ -61,6 +61,21 @@ test('event hole + signal hole = a working counter', () => {
   expect(btn.textContent).toBe('c:3');
 });
 
+test('an event hole given a signal throws instead of failing silently', () => {
+  // the natural mistake: every OTHER hole position accepts a signal. Handing
+  // one to addEventListener registers a non-callable that never fires — no
+  // error, no listener, forever. Name the mistake instead.
+  const handler = signal(() => {});
+  expect(() => html`<button onclick=${handler}>x</button>`).toThrow(
+    /onclick needs a function, not a signal/,
+  );
+  expect(() => html`<button onclick=${'nope'}>x</button>`).toThrow(
+    /onclick needs a function, not a string/,
+  );
+  // a plain function is of course fine, and so is a computed's *value*
+  expect(() => html`<button onclick=${() => {}}>x</button>`).not.toThrow();
+});
+
 test('two instances from one call site are independent (template is cached)', () => {
   /** @param {*} s */
   const make = (s) => /** @type {Element} */ (html`<i>${s}</i>`);

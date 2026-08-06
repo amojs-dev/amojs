@@ -158,3 +158,41 @@ test('GOLDEN nested templates: raw and compiled produce the same markup', async 
   expect(cmpEl.innerHTML).toBe(rawEl.innerHTML);
   expect(rawEl.innerHTML).toBe('[<em>in</em>]');
 });
+
+/* ------------------------------------------------------------------ */
+
+test('GOLDEN a bad event listener fails identically in both modes', async () => {
+  // compiled output routes events through the same runtime helper raw mode
+  // uses (_$event), so the error is one implementation, not two that agree.
+  const src = [
+    "import { signal, html } from '@amojs/core';",
+    'export const make = (h) => html`<button onclick=${h}>x</button>`;',
+    'export const sig = signal(() => {});',
+  ].join('\n');
+
+  const compiled = compileModule(src);
+  expect(compiled).not.toContain('.addEventListener'); // helper, not a bare call
+  expect(compiled).toContain('_$event(');
+
+  const raw = await load(src);
+  const cmp = await load(compiled);
+
+  const failure = (mod: Record<string, any>) => {
+    try {
+      mod.make(mod.sig);
+      return 'no throw';
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+
+  expect(failure(cmp)).toBe(failure(raw));
+  expect(failure(raw)).toMatch(/onclick needs a function, not a signal/);
+
+  // ...and a real function still works in both
+  for (const mod of [raw, cmp]) {
+    let n = 0;
+    mod.make(() => n++).click();
+    expect(n).toBe(1);
+  }
+});

@@ -1,6 +1,6 @@
 {
   "name": "@amojs/bench",
-  "version": "0.6.1-dev",
+  "version": "0.6.2-dev",
   "private": true,
   "type": "module",
   "description": "AmoJS micro-benchmarks — never published. Competitor libraries live here so the runtime keeps zero dependencies.",

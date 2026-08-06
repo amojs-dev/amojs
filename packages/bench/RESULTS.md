@@ -134,13 +134,28 @@ technically distinct is not the same as winning adoption.
 
 ## Size gates (enforced in CI, `core/test/size.test.js` + identity benchmark)
 
-| gate | measured | budget |
-|---|---|---|
-| compiled counter app, ALL-IN (bundle+min+gz) | **1778 B** | ≤ 2048 B |
-| framework minus parser, bundled | 2192 B | ≤ 2560 B |
-| raw-ESM everything incl. parser, per-file sum | 3976 B | ≤ 4096 B |
+Measured 2026-08-06 (core 0.6.4-dev), after the form-control, `onMount`/`ref`
+and event-hole work. The per-file rows are the two real shipping shapes: a
+no-build app loads the parser, a compiled app never does.
+
+| gate | measured | budget | headroom |
+|---|---|---|---|
+| compiled counter app, ALL-IN (bundle+min+gz) | **1982 B** | ≤ 2048 B | 66 B |
+| framework minus parser, bundled | 2520 B | ≤ 2560 B | 40 B |
+| shape A — no-build app, parser included, per-file sum | 4020 B | ≤ 4096 B | 76 B |
+| shape B — compiled app, no parser, per-file sum | 3248 B | ≤ 3328 B | 80 B |
+| identity: compiled ÷ hand-written vanilla (gz) | **1.087** | ≤ 1.10 | — |
 
 The first row is the number frameworks quote: a complete compiled AmoJS
-counter — runtime included — costs **1.78 KB**. A Svelte 5 hello-world lands
+counter — runtime included — costs **1.98 KB**. A Svelte 5 hello-world lands
 around 4–6 KB on the same metric; alien-signals' famous 1.95 KB is the graph
 alone, with no DOM layer at all.
+
+**Headroom is now the binding constraint, not the budget.** Every gate passes,
+but all four sit within 40–80 B of their lid, so the next feature that touches
+the shipped runtime has to pay for itself in architecture (the `/runtime` entry
+is the template for that) rather than in bytes. Two v0.6-era numbers moved for
+recorded reasons: form-control properties cost +154 B, and routing event holes
+through a shared `bindEvent` cost +59 B on shape A while making compiled output
+*smaller* (`_$event(…)` beats `.addEventListener(…)`), which is why the identity
+ratio improved from 1.089 to 1.087.

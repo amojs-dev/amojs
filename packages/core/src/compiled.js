@@ -6,7 +6,7 @@
  * bind.js + this file — nothing else. That missing parser IS the size win.
  */
 
-export { bindChild, bindAttr } from './bind.js';
+export { bindChild, bindAttr, bindEvent } from './bind.js';
 
 /**
  * Cached template factory for compiled output.

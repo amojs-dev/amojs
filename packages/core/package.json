@@ -1,6 +1,6 @@
 {
   "name": "@amojs/core",
-  "version": "0.6.3-dev",
+  "version": "0.6.4-dev",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS reactive core — signals, html`` templates, mount. Zero dependencies; runs raw in the browser.",

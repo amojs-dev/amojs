@@ -14,6 +14,16 @@
  *   - rawtext elements (script/style/textarea/title) are not allowed
  *   - an attribute hole must be the entire attribute value
  *   - holes cannot appear in tag-name or attribute-name position
+ *
+ * FOREIGN CONTENT (svg/math) plays by different rules, and the browser applies
+ * them too — so we must, or a template that works with no build would break
+ * once compiled (LOCKED RULE #3). Inside an <svg> or <math> subtree:
+ *   - self-closing works on ANY element: `<circle r="5"/>` is how SVG is written
+ *   - there are no void elements, so `<circle>` still needs `</circle>`
+ *   - names keep the author's casing (`viewBox`, `gradientTransform`) — SVG
+ *     attribute names are case-SENSITIVE at the setAttribute() boundary
+ *   - script/style/title/desc are ordinary elements, not rawtext
+ * HTML rules resume inside an HTML integration point (foreignObject/desc/title).
  */
 
 import type { TemplateIR, Hole, NodePath } from './ir.js';
@@ -24,18 +34,31 @@ const VOID = new Set([
 ]);
 const RAWTEXT = new Set(['script', 'style', 'textarea', 'title']);
 
+/** elements whose subtree leaves HTML rules behind */
+const FOREIGN_ROOTS = new Set(['svg', 'math']);
+/** inside foreign content, these hand their CHILDREN back to HTML rules */
+const INTEGRATION = new Set(['foreignobject', 'desc', 'title', 'annotation-xml']);
+
 interface Frame {
   tag: string;
+  /** the name as emitted — a closing tag must spell it the same way */
+  emit: string;
   path: NodePath;
   /** child nodes assigned so far: elements, text runs, comments, placeholders */
   count: number;
+  /** are this frame's CHILDREN in foreign content? */
+  foreign: boolean;
 }
 
 interface OpenElement {
   tag: string;
+  /** the name as written, when casing must survive (foreign content) */
+  emit: string;
   path: NodePath;
   /** canonical serialization of the attributes seen so far */
   attrs: string;
+  /** is this element itself in foreign content? */
+  foreign: boolean;
 }
 
 export function parseTemplate(strings: readonly string[]): TemplateIR {
@@ -45,7 +68,9 @@ export function parseTemplate(strings: readonly string[]): TemplateIR {
 class Parser {
   private html = '';
   private holes: Hole[] = [];
-  private stack: Frame[] = [{ tag: '#root', path: [], count: 0 }];
+  private stack: Frame[] = [
+    { tag: '#root', emit: '#root', path: [], count: 0, foreign: false },
+  ];
   /** true while inside a contiguous static text run (one text node) */
   private textOpen = false;
   /** non-null while scanning inside an open tag `<div …` */
@@ -79,7 +104,18 @@ class Parser {
             this.fail('an attribute hole must be the entire quoted value', p);
           }
           i++;
-        } else if (i < s.length && !/[\s/>]/.test(s[i])) {
+        } else if (s[i] === '/') {
+          /* `<circle r=${x}/>` is a trap the BROWSER falls into: "/" does not
+             terminate an unquoted attribute value, so the value becomes "…/"
+             AND the element never self-closes — the next sibling silently
+             becomes a child. Verified in Chrome. Raw mode already rejects it
+             (the marker no longer matches), so the compiler must too. */
+          this.fail(
+            'an unquoted attribute hole cannot be followed by "/>" — ' +
+              'write a space before "/>" or quote the hole',
+            p,
+          );
+        } else if (i < s.length && !/[\s>]/.test(s[i])) {
           this.fail('an attribute hole must be the entire attribute value', p);
         } else if (i >= s.length && p < this.strings.length - 1) {
           this.fail('two holes cannot sit together inside a tag', p);
@@ -142,8 +178,8 @@ class Parser {
           this.fail(`unexpected </${tag}>`, p);
         }
         this.textOpen = false;
-        this.stack.pop();
-        this.html += `</${tag}>`;
+        // spell the close exactly like the open — a foreign name kept its casing
+        this.html += `</${(this.stack.pop() as Frame).emit}>`;
         i += m[0].length;
         continue;
       }
@@ -164,17 +200,21 @@ class Parser {
         const m = /^<([a-zA-Z][a-zA-Z0-9-]*)/.exec(s.slice(i));
         if (!m) this.fail('malformed tag', p);
         const tag = m[1].toLowerCase();
-        if (RAWTEXT.has(tag)) {
+        const parent = this.top();
+        // an <svg>/<math> anywhere opens foreign content; inside it, rawtext
+        // does not exist — <svg><title>Chart</title></svg> is ordinary markup
+        const foreign = parent.foreign || FOREIGN_ROOTS.has(tag);
+        if (!foreign && RAWTEXT.has(tag)) {
           this.fail(`<${tag}> is not supported inside templates`, p);
         }
         this.textOpen = false;
-        const parent = this.top();
         const path = [...parent.path, parent.count++];
         if (this.stack.length === 1) {
           this.rootElements++;
           this.rootElementIndex = path[0];
         }
-        this.el = { tag, path, attrs: '' };
+        // casing survives only in foreign content, where names are meaningful
+        this.el = { tag, emit: foreign ? m[1] : tag, path, attrs: '', foreign };
         return i + m[0].length;
       }
 
@@ -203,9 +243,17 @@ class Parser {
       }
 
       if (ch === '>') {
-        this.html += `<${el.tag}${el.attrs}>`;
-        if (!VOID.has(el.tag)) {
-          this.stack.push({ tag: el.tag, path: el.path, count: 0 });
+        this.html += `<${el.emit}${el.attrs}>`;
+        // foreign content has no void elements: <circle> still needs </circle>
+        if (el.foreign || !VOID.has(el.tag)) {
+          this.stack.push({
+            tag: el.tag,
+            emit: el.emit,
+            path: el.path,
+            count: 0,
+            // an HTML integration point hands its children back to HTML rules
+            foreign: el.foreign && !INTEGRATION.has(el.tag),
+          });
         }
         this.el = null;
         return i + 1;
@@ -213,13 +261,14 @@ class Parser {
 
       if (ch === '/') {
         if (s[i + 1] !== '>') this.fail(`stray "/" in <${el.tag}>`, p);
-        if (!VOID.has(el.tag)) {
+        // in foreign content `/>` really does close the element, for any tag
+        if (!el.foreign && !VOID.has(el.tag)) {
           this.fail(
             `<${el.tag}/> — self-closing is only valid on void elements; write </${el.tag}>`,
             p,
           );
         }
-        this.html += `<${el.tag}${el.attrs}>`;
+        this.html += `<${el.emit}${el.attrs}${el.foreign ? '/' : ''}>`;
         this.el = null;
         return i + 2;
       }
@@ -227,7 +276,9 @@ class Parser {
       // attribute name
       const nm = /^[^\s=/>]+/.exec(s.slice(i));
       if (!nm) this.fail(`unexpected character "${ch}" in <${el.tag}>`, p);
-      const name = nm[0].toLowerCase();
+      // SVG attribute names are case-sensitive at the setAttribute() boundary:
+      // `gradientTransform` lowercased is a different, inert attribute
+      const name = el.foreign ? nm[0] : nm[0].toLowerCase();
       i += nm[0].length;
 
       // optional whitespace before '='
@@ -276,8 +327,11 @@ class Parser {
   }
 
   private pushAttrHole(el: OpenElement, name: string, expr: number): void {
-    if (name.startsWith('on') && name.length > 2) {
-      this.holes.push({ kind: 'event', expr, name: name.slice(2), path: [...el.path] });
+    // event names are always lowercase — addEventListener('Click') is not a
+    // click. Attribute names keep whatever casing scanTag decided on.
+    const lower = name.toLowerCase();
+    if (lower.startsWith('on') && lower.length > 2) {
+      this.holes.push({ kind: 'event', expr, name: lower.slice(2), path: [...el.path] });
     } else {
       this.holes.push({ kind: 'attr', expr, name, path: [...el.path] });
     }

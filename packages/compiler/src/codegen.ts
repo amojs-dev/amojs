@@ -56,6 +56,7 @@ export function compileModule(source: string): string {
   const hoisted: string[] = [];
   let usesChild = false;
   let usesAttr = false;
+  let usesEvent = false;
 
   // innermost/last-in-file first, so outer templates see compiled inners
   const ordered = templates
@@ -69,6 +70,7 @@ export function compileModule(source: string): string {
     hoisted[id] = g.hoisted;
     usesChild ||= g.usesChild;
     usesAttr ||= g.usesAttr;
+    usesEvent ||= g.usesEvent;
 
     const ms = map(t.start);
     const me = map(t.end);
@@ -157,6 +159,7 @@ export function compileModule(source: string): string {
   const names = ['tpl as _$t'];
   if (usesChild) names.push('bindChild as _$child');
   if (usesAttr) names.push('bindAttr as _$attr');
+  if (usesEvent) names.push('bindEvent as _$event');
   const header =
     `\nimport { ${names.join(', ')} } from "@amojs/core/compiled";\n` +
     hoisted.join('\n') +
@@ -173,6 +176,7 @@ interface Generated {
   expr: string;
   usesChild: boolean;
   usesAttr: boolean;
+  usesEvent: boolean;
 }
 
 /** `.firstChild` for index 0, `.childNodes[i]` otherwise — like a human. */
@@ -235,11 +239,15 @@ function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
 
   let usesChild = false;
   let usesAttr = false;
+  let usesEvent = false;
   for (const h of ordered) {
     const v = varFor(h.path);
     const e = exprs[h.expr];
     if (h.kind === 'event') {
-      lines.push(`${v}.addEventListener(${JSON.stringify(h.name)}, ${e});`);
+      // via the runtime helper, not a bare addEventListener: a non-function
+      // listener must fail the same way in both modes (LOCKED RULE #3)
+      usesEvent = true;
+      lines.push(`_$event(${v}, ${JSON.stringify(h.name)}, ${e});`);
     } else if (h.kind === 'attr') {
       usesAttr = true;
       lines.push(`_$attr(${v}, ${JSON.stringify(h.name)}, ${e});`);
@@ -252,5 +260,5 @@ function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
   lines.push(`return ${unwrapIdx !== null ? '_r' : '_f'};`);
 
   const expr = `(() => {\n  ${lines.join('\n  ')}\n})()`;
-  return { hoisted, expr, usesChild, usesAttr };
+  return { hoisted, expr, usesChild, usesAttr, usesEvent };
 }
