@@ -14,3 +14,4 @@ export * from './template.js';
 export * from './codegen.js';
 export * from './build.js';
 export * from './eject.js';
+export * from './diagnose.js';

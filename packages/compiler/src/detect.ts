@@ -22,6 +22,16 @@ export interface DetectedTemplate {
   strings: string[];
   /** source offsets of each `${…}` expression, in order */
   expressions: { start: number; end: number }[];
+  /**
+   * Source offsets of each static part, aligned index-for-index with `strings`.
+   * `start` is the first static character (just past the backtick or the `}`)
+   * and `end` is one past the last, so a position INSIDE a part maps to the
+   * document by plain addition — which is what turns a parse error into a
+   * squiggle. Kept separate from `strings` because those are the COOKED values:
+   * with an escape in the template, cooked and raw lengths differ, and a
+   * consumer has to notice rather than silently mis-place the range.
+   */
+  quasis: { start: number; end: number }[];
 }
 
 /**
@@ -53,7 +63,7 @@ export function detectTemplates(source: string): DetectedTemplate[] {
     const tag = node.tag as { type: string; name?: string };
     if (tag.type !== 'Identifier' || !htmlNames.has(tag.name ?? '')) return;
     const quasi = node.quasi as {
-      quasis: { value: { cooked?: string; raw: string } }[];
+      quasis: { start: number; end: number; value: { cooked?: string; raw: string } }[];
       expressions: { start: number; end: number }[];
     };
     found.push({
@@ -62,6 +72,7 @@ export function detectTemplates(source: string): DetectedTemplate[] {
       end: node.end,
       strings: quasi.quasis.map((q) => q.value.cooked ?? q.value.raw),
       expressions: quasi.expressions.map((e) => ({ start: e.start, end: e.end })),
+      quasis: quasi.quasis.map((q) => ({ start: q.start, end: q.end })),
     });
   });
   return found;

@@ -1,6 +1,6 @@
 {
   "name": "amojs-compiler",
-  "version": "0.6.5-dev",
+  "version": "0.6.6-dev",
   "private": true,
   "type": "module",
   "license": "MIT",

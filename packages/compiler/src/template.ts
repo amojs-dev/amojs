@@ -39,6 +39,12 @@ const FOREIGN_ROOTS = new Set(['svg', 'math']);
 /** inside foreign content, these hand their CHILDREN back to HTML rules */
 const INTEGRATION = new Set(['foreignobject', 'desc', 'title', 'annotation-xml']);
 
+/** where a construct started, so an error can point AT it rather than at EOF */
+interface Origin {
+  part: number;
+  offset: number;
+}
+
 interface Frame {
   tag: string;
   /** the name as emitted — a closing tag must spell it the same way */
@@ -48,6 +54,8 @@ interface Frame {
   count: number;
   /** are this frame's CHILDREN in foreign content? */
   foreign: boolean;
+  /** the `<` of the opening tag — what "unclosed <div>" should underline */
+  origin: Origin;
 }
 
 interface OpenElement {
@@ -59,6 +67,34 @@ interface OpenElement {
   attrs: string;
   /** is this element itself in foreign content? */
   foreign: boolean;
+  /** the `<` of this tag */
+  origin: Origin;
+}
+
+/**
+ * A strict-subset violation, located.
+ *
+ * `part` is the index of the static string the error sits in and `offset` is the
+ * character index inside that string — a position relative to the TEMPLATE, not
+ * to any file, because the parser is given strings and never sees a document.
+ * Turning that into a document range is `diagnose()`'s job.
+ *
+ * `message` keeps the decorated form the CLI prints; `detail` is the bare
+ * sentence, which is what belongs in an editor squiggle that already points at
+ * the spot.
+ */
+export class TemplateError extends Error {
+  readonly detail: string;
+  readonly part: number;
+  readonly offset: number;
+
+  constructor(detail: string, part: number, offset: number) {
+    super(`amo compiler: ${detail} (template part ${part})`);
+    this.name = 'TemplateError';
+    this.detail = detail;
+    this.part = part;
+    this.offset = offset;
+  }
 }
 
 export function parseTemplate(strings: readonly string[]): TemplateIR {
@@ -69,7 +105,14 @@ class Parser {
   private html = '';
   private holes: Hole[] = [];
   private stack: Frame[] = [
-    { tag: '#root', emit: '#root', path: [], count: 0, foreign: false },
+    {
+      tag: '#root',
+      emit: '#root',
+      path: [],
+      count: 0,
+      foreign: false,
+      origin: { part: 0, offset: 0 },
+    },
   ];
   /** true while inside a contiguous static text run (one text node) */
   private textOpen = false;
@@ -88,8 +131,9 @@ class Parser {
     return this.stack[this.stack.length - 1];
   }
 
-  private fail(msg: string, part: number): never {
-    throw new Error(`amo compiler: ${msg} (template part ${part})`);
+  /** @param offset character index within part `part` — where to point. */
+  private fail(msg: string, part: number, offset: number): never {
+    throw new TemplateError(msg, part, offset);
   }
 
   parse(): TemplateIR {
@@ -101,7 +145,7 @@ class Parser {
         // re-entering right after an attribute-value hole
         if (this.resume.quote !== null) {
           if (s[i] !== this.resume.quote) {
-            this.fail('an attribute hole must be the entire quoted value', p);
+            this.fail('an attribute hole must be the entire quoted value', p, i);
           }
           i++;
         } else if (s[i] === '/') {
@@ -114,11 +158,13 @@ class Parser {
             'an unquoted attribute hole cannot be followed by "/>" — ' +
               'write a space before "/>" or quote the hole',
             p,
+            i,
           );
         } else if (i < s.length && !/[\s>]/.test(s[i])) {
-          this.fail('an attribute hole must be the entire attribute value', p);
+          this.fail('an attribute hole must be the entire attribute value', p, i);
         } else if (i >= s.length && p < this.strings.length - 1) {
-          this.fail('two holes cannot sit together inside a tag', p);
+          // the part is empty: point at its start, which is where the two holes meet
+          this.fail('two holes cannot sit together inside a tag', p, i);
         }
         this.resume = null;
       }
@@ -130,9 +176,13 @@ class Parser {
       if (p < this.strings.length - 1) this.boundary(p);
     }
 
-    if (this.el) this.fail(`template ends inside <${this.el.tag}>`, this.strings.length - 1);
+    if (this.el) {
+      const { tag, origin } = this.el;
+      this.fail(`template ends inside <${tag}>`, origin.part, origin.offset);
+    }
     if (this.stack.length > 1) {
-      this.fail(`unclosed <${this.top().tag}>`, this.strings.length - 1);
+      const f = this.top();
+      this.fail(`unclosed <${f.tag}>`, f.origin.part, f.origin.offset);
     }
     const singleRootIndex =
       this.rootElements === 1 && !this.rootOther ? this.rootElementIndex : null;
@@ -143,7 +193,11 @@ class Parser {
   private boundary(p: number): void {
     if (this.resume) return; // attribute-value hole — already recorded by scanTag
     if (this.el) {
-      this.fail('a hole may only be an element child or a full attribute value', p);
+      this.fail(
+        'a hole may only be an element child or a full attribute value',
+        p,
+        this.strings[p].length,
+      );
     }
     const f = this.top();
     this.textOpen = false;
@@ -172,10 +226,10 @@ class Parser {
       if (next === '/') {
         // closing tag
         const m = /^<\/([a-zA-Z][a-zA-Z0-9-]*)\s*>/.exec(s.slice(i));
-        if (!m) this.fail('malformed closing tag', p);
+        if (!m) this.fail('malformed closing tag', p, i);
         const tag = m[1].toLowerCase();
         if (this.stack.length === 1 || this.top().tag !== tag) {
-          this.fail(`unexpected </${tag}>`, p);
+          this.fail(`unexpected </${tag}>`, p, i);
         }
         this.textOpen = false;
         // spell the close exactly like the open — a foreign name kept its casing
@@ -186,7 +240,7 @@ class Parser {
 
       if (s.startsWith('<!--', i)) {
         const end = s.indexOf('-->', i + 4);
-        if (end === -1) this.fail('a hole cannot appear inside a comment', p);
+        if (end === -1) this.fail('a hole cannot appear inside a comment', p, i);
         this.textOpen = false;
         if (this.stack.length === 1) this.rootOther = true;
         this.top().count++;
@@ -198,14 +252,14 @@ class Parser {
       if (next !== undefined && /[a-zA-Z]/.test(next)) {
         // opening tag — hand over to scanTag
         const m = /^<([a-zA-Z][a-zA-Z0-9-]*)/.exec(s.slice(i));
-        if (!m) this.fail('malformed tag', p);
+        if (!m) this.fail('malformed tag', p, i);
         const tag = m[1].toLowerCase();
         const parent = this.top();
         // an <svg>/<math> anywhere opens foreign content; inside it, rawtext
         // does not exist — <svg><title>Chart</title></svg> is ordinary markup
         const foreign = parent.foreign || FOREIGN_ROOTS.has(tag);
         if (!foreign && RAWTEXT.has(tag)) {
-          this.fail(`<${tag}> is not supported inside templates`, p);
+          this.fail(`<${tag}> is not supported inside templates`, p, i);
         }
         this.textOpen = false;
         const path = [...parent.path, parent.count++];
@@ -214,7 +268,14 @@ class Parser {
           this.rootElementIndex = path[0];
         }
         // casing survives only in foreign content, where names are meaningful
-        this.el = { tag, emit: foreign ? m[1] : tag, path, attrs: '', foreign };
+        this.el = {
+          tag,
+          emit: foreign ? m[1] : tag,
+          path,
+          attrs: '',
+          foreign,
+          origin: { part: p, offset: i }, // the `<`
+        };
         return i + m[0].length;
       }
 
@@ -251,6 +312,7 @@ class Parser {
             emit: el.emit,
             path: el.path,
             count: 0,
+            origin: el.origin, // carried so "unclosed <div>" can point at the `<`
             // an HTML integration point hands its children back to HTML rules
             foreign: el.foreign && !INTEGRATION.has(el.tag),
           });
@@ -260,12 +322,13 @@ class Parser {
       }
 
       if (ch === '/') {
-        if (s[i + 1] !== '>') this.fail(`stray "/" in <${el.tag}>`, p);
+        if (s[i + 1] !== '>') this.fail(`stray "/" in <${el.tag}>`, p, i);
         // in foreign content `/>` really does close the element, for any tag
         if (!el.foreign && !VOID.has(el.tag)) {
           this.fail(
             `<${el.tag}/> — self-closing is only valid on void elements; write </${el.tag}>`,
             p,
+            i, // the offending "/"
           );
         }
         this.html += `<${el.emit}${el.attrs}${el.foreign ? '/' : ''}>`;
@@ -275,7 +338,7 @@ class Parser {
 
       // attribute name
       const nm = /^[^\s=/>]+/.exec(s.slice(i));
-      if (!nm) this.fail(`unexpected character "${ch}" in <${el.tag}>`, p);
+      if (!nm) this.fail(`unexpected character "${ch}" in <${el.tag}>`, p, i);
       // SVG attribute names are case-sensitive at the setAttribute() boundary:
       // `gradientTransform` lowercased is a different, inert attribute
       const name = el.foreign ? nm[0] : nm[0].toLowerCase();
@@ -312,13 +375,13 @@ class Parser {
             this.resume = { quote: q };
             return s.length;
           }
-          this.fail('an attribute hole must be the entire quoted value', p);
+          this.fail('an attribute hole must be the entire quoted value', p, i);
         }
         el.attrs += ` ${name}=${q}${s.slice(i + 1, close)}${q}`;
         i = close + 1;
       } else {
         const vm = /^[^\s/>]+/.exec(s.slice(i));
-        if (!vm) this.fail(`missing value for "${name}" in <${el.tag}>`, p);
+        if (!vm) this.fail(`missing value for "${name}" in <${el.tag}>`, p, i);
         el.attrs += ` ${name}=${vm[0]}`;
         i += vm[0].length;
       }
