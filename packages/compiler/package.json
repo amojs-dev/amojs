@@ -1,6 +1,6 @@
 {
   "name": "amojs-compiler",
-  "version": "0.6.6-dev",
+  "version": "0.6.7-dev",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./diagnose": {
+      "types": "./dist/diagnose.d.ts",
+      "default": "./dist/diagnose.js"
     }
   },
   "engines": {
