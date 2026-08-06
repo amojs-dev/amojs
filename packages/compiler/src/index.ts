@@ -1,5 +1,5 @@
 /**
- * @amojs/compiler — public surface.
+ * amojs-compiler — public surface.
  *
  * Pipeline (v0.2):
  *   detect (acorn)  →  template parse  →  TemplateIR  →  codegen

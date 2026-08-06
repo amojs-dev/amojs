@@ -1,12 +1,12 @@
 /**
  * Codegen — TemplateIR → the vanilla JS you would have written.
  *
- * `compileModule(source)` replaces every `html\`…\`` owned by @amojs/core
+ * `compileModule(source)` replaces every `html\`…\`` owned by amojs
  * with generated code: a hoisted cached template + positional childNodes
  * walks + one binding per hole. In the browser, compiled output does no
  * template parsing at all — that removed work is the whole point.
  *
- * Generated code imports its helpers from '@amojs/core/compiled'
+ * Generated code imports its helpers from 'amojs/compiled'
  * (never the template parser). The hole-rule dispatch (constant | signal |
  * function) stays at runtime inside bindChild/bindAttr — the same functions
  * raw mode uses, so identical behavior holds by construction.
@@ -35,7 +35,7 @@ export function compileModule(source: string): string {
     importEnd = node.end;
     const decl = node as unknown as AnyNode;
     if (
-      decl.source.value === '@amojs/core' &&
+      decl.source.value === 'amojs' &&
       decl.specifiers.some(
         (s: AnyNode) =>
           s.type === 'ImportSpecifier' &&
@@ -111,7 +111,7 @@ export function compileModule(source: string): string {
       // parser-free import → the '/runtime' entry: raw ESM has no
       // tree-shaking, and the package root statically pulls html.js in
       const keepsHtml = keep.some((s: AnyNode) => s.imported.name === 'html');
-      const source = keepsHtml ? '@amojs/core' : '@amojs/core/runtime';
+      const source = keepsHtml ? 'amojs' : 'amojs/runtime';
       const text = keep.length
         ? `import { ${keep
             .map((s) =>
@@ -128,22 +128,22 @@ export function compileModule(source: string): string {
     }
   }
 
-  // retarget every OTHER parser-free '@amojs/core' import / re-export to
-  // '@amojs/core/runtime' as well (e.g. `export { flushSync } from …`) —
+  // retarget every OTHER parser-free 'amojs' import / re-export to
+  // 'amojs/runtime' as well (e.g. `export { flushSync } from …`) —
   // one html-free specifier list means the module never needs the parser
-  const RUNTIME_SPEC = `'@amojs/core/runtime'`;
+  const RUNTIME_SPEC = `'amojs/runtime'`;
   for (const node of ast.body) {
     const decl = node as unknown as AnyNode;
     if (decl === coreImport) continue; // handled (or deliberately kept) above
     let touchesHtml: boolean;
-    if (node.type === 'ImportDeclaration' && decl.source.value === '@amojs/core') {
+    if (node.type === 'ImportDeclaration' && decl.source.value === 'amojs') {
       touchesHtml = decl.specifiers.some(
         (s: AnyNode) => s.type !== 'ImportSpecifier' || s.imported.name === 'html',
       );
     } else if (
       node.type === 'ExportNamedDeclaration' &&
       decl.source &&
-      decl.source.value === '@amojs/core'
+      decl.source.value === 'amojs'
     ) {
       touchesHtml = decl.specifiers.some((s: AnyNode) => s.local.name === 'html');
     } else {
@@ -161,7 +161,7 @@ export function compileModule(source: string): string {
   if (usesAttr) names.push('bindAttr as _$attr');
   if (usesEvent) names.push('bindEvent as _$event');
   const header =
-    `\nimport { ${names.join(', ')} } from "@amojs/core/compiled";\n` +
+    `\nimport { ${names.join(', ')} } from "amojs/compiled";\n` +
     hoisted.join('\n') +
     '\n';
 

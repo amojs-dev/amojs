@@ -5,9 +5,9 @@
  *   1. compile every module (buildDir)
  *   2. copy the runtime source files — plain, commented JS — into
  *      <outDir>/<runtimeDir>/ (they only import each other relatively),
- *      resolved from the PROJECT's own installed @amojs/core when there is
+ *      resolved from the PROJECT's own installed amojs when there is
  *      one, so the user keeps the exact version their code was written against
- *   3. rewrite every '@amojs/core[/runtime|/compiled]' specifier to a
+ *   3. rewrite every 'amojs[/runtime|/compiled]' specifier to a
  *      relative path
  *
  * The result has ZERO bare imports: module resolution never touches
@@ -48,16 +48,16 @@ const HERE = import.meta.url.startsWith('file:')
 /**
  * Where to copy the runtime FROM.
  *
- * The project being ejected wins: its installed `@amojs/core` is the version
+ * The project being ejected wins: its installed `amojs` is the version
  * its code was written against, so that is the copy the user gets to keep.
- * Then the compiler's own install (`npx @amojs/cli` in a project without the
+ * Then the compiler's own install (`npx amojs-cli` in a project without the
  * dependency). Then the dev-phase workspace layout.
  */
 function findCoreSrc(projectDir: string): string {
   for (const base of [projectDir, HERE]) {
     try {
       // resolve() honors the package's `exports` map: "." → src/index.js
-      return dirname(createRequire(join(base, 'noop.js')).resolve('@amojs/core'));
+      return dirname(createRequire(join(base, 'noop.js')).resolve('amojs'));
     } catch {
       // not installed from here — keep looking
     }
@@ -91,7 +91,7 @@ export async function ejectDir(
       await copyFile(from, join(rtOut, file));
     } catch {
       throw new Error(
-        `amo eject: cannot read the runtime file ${from} — is @amojs/core installed?`,
+        `amo eject: cannot read the runtime file ${from} — is amojs installed?`,
       );
     }
     runtime.push(join(runtimeDir, file));
@@ -105,12 +105,12 @@ export async function ejectDir(
     let prefix = relative(dirname(join(outDir, rel)), rtOut).split('\\').join('/');
     if (!prefix.startsWith('.')) prefix = `./${prefix}`;
     const out = source
-      .replaceAll('"@amojs/core/compiled"', `"${prefix}/compiled.js"`)
-      .replaceAll("'@amojs/core/compiled'", `'${prefix}/compiled.js'`)
-      .replaceAll('"@amojs/core/runtime"', `"${prefix}/runtime.js"`)
-      .replaceAll("'@amojs/core/runtime'", `'${prefix}/runtime.js'`)
-      .replaceAll('"@amojs/core"', `"${prefix}/index.js"`)
-      .replaceAll("'@amojs/core'", `'${prefix}/index.js'`);
+      .replaceAll('"amojs/compiled"', `"${prefix}/compiled.js"`)
+      .replaceAll("'amojs/compiled'", `'${prefix}/compiled.js'`)
+      .replaceAll('"amojs/runtime"', `"${prefix}/runtime.js"`)
+      .replaceAll("'amojs/runtime'", `'${prefix}/runtime.js'`)
+      .replaceAll('"amojs"', `"${prefix}/index.js"`)
+      .replaceAll("'amojs'", `'${prefix}/index.js'`);
     if (out !== source) await writeFile(file, out);
   }
 

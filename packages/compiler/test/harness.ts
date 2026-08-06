@@ -2,7 +2,7 @@
  * Shared fixture harness for dual-mode tests.
  *
  * Fixture modules are written inside the project (test/__tmp__, gitignored)
- * so the test runner resolves them like any other module; bare @amojs/core
+ * so the test runner resolves them like any other module; bare amojs
  * specifiers are rewritten to relative paths first.
  */
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ const HERE = import.meta.url.startsWith('file:')
 const TMP = join(HERE, '__tmp__', randomUUID());
 const CORE_SRC = join(HERE, '../../core/src');
 
-/** rewrite bare @amojs specifiers to paths relative to the fixture's dir */
+/** rewrite bare amojs specifiers to paths relative to the fixture's dir */
 export function resolveSpecifiers(src: string, fromDir: string): string {
   const rel = (file: string): string =>
     relative(fromDir, join(CORE_SRC, file)).split('\\').join('/');
@@ -28,12 +28,12 @@ export function resolveSpecifiers(src: string, fromDir: string): string {
   const runtime = rel('runtime.js');
   const helpers = rel('compiled.js');
   return src
-    .replaceAll('"@amojs/core/compiled"', `"${helpers}"`)
-    .replaceAll("'@amojs/core/compiled'", `'${helpers}'`)
-    .replaceAll('"@amojs/core/runtime"', `"${runtime}"`)
-    .replaceAll("'@amojs/core/runtime'", `'${runtime}'`)
-    .replaceAll('"@amojs/core"', `"${core}"`)
-    .replaceAll("'@amojs/core'", `'${core}'`);
+    .replaceAll('"amojs/compiled"', `"${helpers}"`)
+    .replaceAll("'amojs/compiled'", `'${helpers}'`)
+    .replaceAll('"amojs/runtime"', `"${runtime}"`)
+    .replaceAll("'amojs/runtime'", `'${runtime}'`)
+    .replaceAll('"amojs"', `"${core}"`)
+    .replaceAll("'amojs'", `'${core}'`);
 }
 
 export { TMP };

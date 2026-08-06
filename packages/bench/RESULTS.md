@@ -1,7 +1,7 @@
 # AmoJS benchmark results — v0.6
 
 **Date:** 2026-08-05 · **Machine:** Apple M4 Pro, node v24.12.0, happy-dom (no real browser)
-**Versions:** @amojs/core 0.6.0-dev · solid-js 1.9.14 · @vue/reactivity 3.6.0-rc.2 (the alien-signals-based Vapor core) · alien-signals 3.2.1
+**Versions:** amojs 0.6.0-dev · solid-js 1.9.14 · @vue/reactivity 3.6.0-rc.2 (the alien-signals-based Vapor core) · alien-signals 3.2.1
 
 Run with `pnpm bench`. Higher `hz` = better.
 

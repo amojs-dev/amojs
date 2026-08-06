@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { compileModule } from '../src/codegen.js';
 
 const COUNTER = [
-  "import { signal, computed, html } from '@amojs/core';",
+  "import { signal, computed, html } from 'amojs';",
   'export function Counter() {',
   '  const count = signal(0);',
   '  const double = computed(() => count.value * 2);',
@@ -18,16 +18,16 @@ test('a module without amo templates passes through untouched', () => {
 test('compiles the counter: hoisted template, walks, bindings — no html`` left', () => {
   const out = compileModule(COUNTER);
   expect(out).not.toContain('html`');
-  expect(out).toContain('from "@amojs/core/compiled"');
+  expect(out).toContain('from "amojs/compiled"');
   expect(out).toContain('c:<!---->|<!----></button>'); // static html + hole markers
   expect(out).toContain('[[0,1],[0,3]]'); // placeholder paths
   expect(out).toContain('_$event(_r, "click", () => count.value++)');
   expect(out).toContain('_$child(');
   // helper import + hoisted template land AFTER the original imports
-  expect(out.indexOf('@amojs/core/compiled')).toBeGreaterThan(
-    out.indexOf("'@amojs/core/runtime'"),
+  expect(out.indexOf('amojs/compiled')).toBeGreaterThan(
+    out.indexOf("'amojs/runtime'"),
   );
-  expect(out.indexOf("'@amojs/core/runtime'")).toBeGreaterThan(-1);
+  expect(out.indexOf("'amojs/runtime'")).toBeGreaterThan(-1);
 });
 
 test('unwrap decision is static: single-root template roots the walks at the element', () => {
@@ -39,7 +39,7 @@ test('unwrap decision is static: single-root template roots the walks at the ele
 
 test('nested templates compile innermost-first, offsets stay correct', () => {
   const src = [
-    "import { html } from '@amojs/core';",
+    "import { html } from 'amojs';",
     'export function Wrap() {',
     '  return html`<div>[${html`<em>in</em>`}]</div>`;',
     '}',
@@ -53,7 +53,7 @@ test('nested templates compile innermost-first, offsets stay correct', () => {
 
 test('only used helpers are imported', () => {
   const src = [
-    "import { html } from '@amojs/core';",
+    "import { html } from 'amojs';",
     'export const el = html`<p>static</p>`;',
   ].join('\n');
   const out = compileModule(src);

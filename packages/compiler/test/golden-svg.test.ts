@@ -20,8 +20,8 @@ afterAll(cleanupFixtures);
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const FIXTURE = [
-  "import { signal, html, mount } from '@amojs/core';",
-  "export { flushSync, mount } from '@amojs/core';",
+  "import { signal, html, mount } from 'amojs';",
+  "export { flushSync, mount } from 'amojs';",
   'export function App() {',
   '  const r = signal(5);',
   '  const label = signal("five");',
@@ -111,7 +111,7 @@ test('a self-closed svg element does not swallow its siblings', async () => {
   // the failure this guards: emitting `<circle>` without the slash makes the
   // reparse treat every later sibling as a CHILD, so all their paths shift
   const src = [
-    "import { html } from '@amojs/core';",
+    "import { html } from 'amojs';",
     'export const make = (a, b) =>',
     '  html`<svg><circle r="${a}"/><text>${b}</text></svg>`;',
   ].join('\n');

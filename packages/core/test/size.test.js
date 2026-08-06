@@ -3,7 +3,7 @@
  *
  * Three lids on the library. (The headline number — the ≤2KB ALL-IN cost of a
  * real compiled app, the metric frameworks actually quote — lives with the
- * identity benchmark in @amojs/compiler, which can compile fixtures.)
+ * identity benchmark in amojs-compiler, which can compile fixtures.)
  *
  * The per-file gates below measure what a browser actually FETCHES with no
  * bundler: every file min+gzipped on its own and summed. There are exactly

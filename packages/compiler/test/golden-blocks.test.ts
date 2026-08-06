@@ -12,8 +12,8 @@ import { load, cleanupFixtures } from './harness.js';
 afterAll(cleanupFixtures);
 
 const COND = [
-  "import { signal, html } from '@amojs/core';",
-  "export { flushSync } from '@amojs/core';",
+  "import { signal, html } from 'amojs';",
+  "export { flushSync } from 'amojs';",
   'export function App() {',
   '  const on = signal(true);',
   '  const el = html`<div><button onclick=${() => (on.value = !on.value)}>t</button>${() => (on.value ? html`<b>YES</b>` : html`<i>no</i>`)}</div>`;',
@@ -48,8 +48,8 @@ test('GOLDEN conditional block: raw and compiled behave identically', async () =
 });
 
 const LIST = [
-  "import { signal, html, each } from '@amojs/core';",
-  "export { flushSync } from '@amojs/core';",
+  "import { signal, html, each } from 'amojs';",
+  "export { flushSync } from 'amojs';",
   'export function App() {',
   '  const items = signal([1, 2, 3]);',
   '  const el = html`<ul>${each(items, (k) => k, (k) => html`<li>${String(k)}</li>`)}</ul>`;',
@@ -83,7 +83,7 @@ async function runList(src: string) {
 test('GOLDEN keyed list: raw and compiled behave identically', async () => {
   const compiled = compileModule(LIST);
   expect(compiled).not.toContain('html`');
-  expect(compiled).toContain("import { signal, each } from '@amojs/core/runtime';"); // html stripped, each kept, parser-free entry
+  expect(compiled).toContain("import { signal, each } from 'amojs/runtime';"); // html stripped, each kept, parser-free entry
   const raw = await runList(LIST);
   const cmp = await runList(compiled);
   expect(cmp).toEqual(raw);

@@ -13,7 +13,7 @@ import { loadModules, cleanupFixtures } from './harness.js';
 afterAll(cleanupFixtures);
 
 const CHILD = [
-  "import { html } from '@amojs/core';",
+  "import { html } from 'amojs';",
   '/** a component is a plain exported function; props are its arguments */',
   'export function Child(label) {',
   '  return html`<em>${label}</em>|<i>${() => label.value.toUpperCase()}</i>`;',
@@ -21,9 +21,9 @@ const CHILD = [
 ].join('\n');
 
 const MAIN = [
-  "import { signal, html } from '@amojs/core';",
+  "import { signal, html } from 'amojs';",
   "import { Child } from './child.mjs';",
-  "export { flushSync } from '@amojs/core';",
+  "export { flushSync } from 'amojs';",
   'export function make() {',
   "  const name = signal('a');",
   '  const on = signal(true);',

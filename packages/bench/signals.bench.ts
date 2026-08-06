@@ -1,5 +1,5 @@
 /**
- * Signal-core micro-benchmarks: @amojs/core vs the reactivity engines of
+ * Signal-core micro-benchmarks: amojs vs the reactivity engines of
  * Solid, Vue Vapor (@vue/reactivity 3.6 = alien-based) and alien-signals.
  *
  * Methodology notes (also in RESULTS.md):
@@ -12,7 +12,7 @@
 import { bench, describe } from 'vitest';
 import {
   signal as aSignal, computed as aComputed, effect as aEffect, flushSync,
-} from '@amojs/core/runtime';
+} from 'amojs/runtime';
 import {
   createRoot, createSignal, createMemo, createEffect,
 } from 'solid-js/dist/solid.js';

@@ -1,5 +1,5 @@
 {
-  "name": "amojs",
+  "name": "amojs-monorepo",
   "private": true,
   "type": "module",
   "description": "AmoJS monorepo — a fine-grained UI compiler that writes the vanilla JS you would have written.",

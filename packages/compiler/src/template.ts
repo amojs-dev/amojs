@@ -2,7 +2,7 @@
  * Build-time template parser — the static strings of a detected `html` tag
  * become a TemplateIR: static markup + holes with positional paths.
  *
- * Semantics mirror the runtime parser in @amojs/core (html.js) — the runtime
+ * Semantics mirror the runtime parser in amojs (html.js) — the runtime
  * is the semantic source of truth (LOCKED RULE #3). The difference: the
  * runtime lets the browser build the tree and then walks it; here there is
  * no DOM (LOCKED RULE #4), so a small tokenizer does the node-index
@@ -149,7 +149,7 @@ class Parser {
     this.textOpen = false;
     // an empty comment marks the spot: it keeps adjacent static text nodes
     // apart through serialize→parse, so NodePaths stay valid. Consumers swap
-    // it for an empty text node (see @amojs/core/compiled tpl()).
+    // it for an empty text node (see amojs/compiled tpl()).
     this.html += '<!---->';
     this.holes.push({ kind: 'child', expr: p, path: [...f.path, f.count++] });
   }

@@ -40,7 +40,7 @@ async function write(rel: string, content: string): Promise<void> {
 }
 
 const APP = [
-  "import { signal, html } from '@amojs/core';",
+  "import { signal, html } from 'amojs';",
   'export const el = html`<p>${signal(1)}</p>`;',
 ].join('\n');
 
@@ -61,7 +61,7 @@ test('amo build: compiles the fixture project through the real binary', async ()
   expect(css).toBe('p { color: red }');
 });
 
-test('amo eject: output through the real binary has zero bare @amojs imports', async () => {
+test('amo eject: output through the real binary has zero bare amojs imports', async () => {
   await write('proj2/src/app.js', APP);
 
   const { stdout } = await run(process.execPath, [
@@ -76,7 +76,7 @@ test('amo eject: output through the real binary has zero bare @amojs imports', a
   expect(stdout).toContain('runtime taken from ');
 
   const app = await readFile(join(TMP, 'dist-eject/src/app.js'), 'utf8');
-  expect(app).not.toMatch(/from\s+['"]@amojs/);
+  expect(app).not.toMatch(/from\s+['"]amojs/);
   expect(app).toContain('../amo-runtime/');
 });
 

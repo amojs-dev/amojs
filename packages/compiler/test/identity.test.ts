@@ -3,7 +3,7 @@
  * THE IDENTITY BENCHMARK — the v0.2 PASS criterion and AmoJS's signature:
  * "compiles to the vanilla JS you would have written."
  *
- * A careful human writes the same counter by hand against @amojs/core
+ * A careful human writes the same counter by hand against amojs
  * signals — real createElement / createTextNode / addEventListener, no
  * templates. The compiled module must (a) behave identically to it and
  * (b) cost at most +10% of its bytes (gzip — normalizes naming noise).
@@ -18,8 +18,8 @@ import { load, cleanupFixtures, resolveSpecifiers, TMP } from './harness.js';
 afterAll(cleanupFixtures);
 
 const FIXTURE = [
-  "import { signal, computed, html } from '@amojs/core';",
-  "export { flushSync } from '@amojs/core';",
+  "import { signal, computed, html } from 'amojs';",
+  "export { flushSync } from 'amojs';",
   'export function Counter() {',
   '  const count = signal(0);',
   '  const double = computed(() => count.value * 2);',
@@ -30,8 +30,8 @@ const FIXTURE = [
 /* the reference: what a disciplined human writes for the same behavior —
    including importing the parser-free entry, exactly like compiled output */
 const REFERENCE = [
-  "import { signal, computed, effect } from '@amojs/core/runtime';",
-  "export { flushSync } from '@amojs/core/runtime';",
+  "import { signal, computed, effect } from 'amojs/runtime';",
+  "export { flushSync } from 'amojs/runtime';",
   'export function Counter() {',
   '  const count = signal(0);',
   '  const double = computed(() => count.value * 2);',
@@ -109,7 +109,7 @@ test('identity side-effect: compiled module no longer imports the template parse
   const compiled = compileModule(FIXTURE);
   // parser-free imports point at the /runtime entry — the package root would
   // statically pull html.js in, and raw ESM has no tree-shaking
-  expect(compiled).toContain("import { signal, computed } from '@amojs/core/runtime';");
-  expect(compiled).toContain("export { flushSync } from '@amojs/core/runtime';");
+  expect(compiled).toContain("import { signal, computed } from 'amojs/runtime';");
+  expect(compiled).toContain("export { flushSync } from 'amojs/runtime';");
   expect(compiled).not.toMatch(/\bhtml\b/);
 });

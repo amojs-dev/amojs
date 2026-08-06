@@ -3,7 +3,7 @@ import { detectTemplates } from '../src/detect.js';
 
 test('detects a basic html`` template with strings and expression offsets', () => {
   const src = [
-    `import { html } from '@amojs/core';`,
+    `import { html } from 'amojs';`,
     'const el = html`<p>${x} و ${y}</p>`;',
   ].join('\n');
   const found = detectTemplates(src);
@@ -18,7 +18,7 @@ test('detects a basic html`` template with strings and expression offsets', () =
 
 test('tracks an import alias: import { html as h }', () => {
   const src = [
-    `import { html as h } from '@amojs/core';`,
+    `import { html as h } from 'amojs';`,
     'export const a = h`<i>t</i>`;',
   ].join('\n');
   const found = detectTemplates(src);
@@ -34,14 +34,14 @@ test('ignores an html tag imported from another package', () => {
   expect(detectTemplates(src)).toHaveLength(0);
 });
 
-test('ignores a local function named html (no @amojs/core import)', () => {
+test('ignores a local function named html (no amojs import)', () => {
   const src = ['const html = (s) => s;', 'html`<p>t</p>`;'].join('\n');
   expect(detectTemplates(src)).toHaveLength(0);
 });
 
 test('ignores unrelated tagged templates in a file that does import html', () => {
   const src = [
-    `import { html } from '@amojs/core';`,
+    `import { html } from 'amojs';`,
     'const css = (s) => s;',
     'css`p { color: red }`;',
     'const el = html`<p>t</p>`;',
@@ -53,7 +53,7 @@ test('ignores unrelated tagged templates in a file that does import html', () =>
 
 test('finds multiple templates, including one nested inside a hole', () => {
   const src = [
-    `import { html } from '@amojs/core';`,
+    `import { html } from 'amojs';`,
     'const a = html`<div>${html`<em>in</em>`}</div>`;',
     'const b = html`<span>${x}</span>`;',
   ].join('\n');
@@ -63,6 +63,6 @@ test('finds multiple templates, including one nested inside a hole', () => {
   expect(allStrings).toContain('<em>in</em>');
 });
 
-test('a file with no @amojs/core import returns [] fast', () => {
+test('a file with no amojs import returns [] fast', () => {
   expect(detectTemplates('export const n = 1;')).toEqual([]);
 });

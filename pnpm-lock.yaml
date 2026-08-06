@@ -26,18 +26,18 @@ importers:
 
   packages/bench:
     devDependencies:
-      '@amojs/compiler':
-        specifier: workspace:*
-        version: link:../compiler
-      '@amojs/core':
-        specifier: workspace:*
-        version: link:../core
       '@vue/reactivity':
         specifier: 3.6.0-rc.2
         version: 3.6.0-rc.2
       alien-signals:
         specifier: ^3.2.0
         version: 3.2.1
+      amojs:
+        specifier: workspace:*
+        version: link:../core
+      amojs-compiler:
+        specifier: workspace:*
+        version: link:../compiler
       lit:
         specifier: ^3.3.3
         version: 3.3.3
@@ -47,21 +47,21 @@ importers:
 
   packages/cli:
     dependencies:
-      '@amojs/compiler':
-        specifier: workspace:*
-        version: link:../compiler
-      '@amojs/core':
+      amojs:
         specifier: workspace:*
         version: link:../core
+      amojs-compiler:
+        specifier: workspace:*
+        version: link:../compiler
 
   packages/compiler:
     dependencies:
-      '@amojs/core':
-        specifier: workspace:*
-        version: link:../core
       acorn:
         specifier: ^8.18.0
         version: 8.18.0
+      amojs:
+        specifier: workspace:*
+        version: link:../core
 
   packages/core: {}
 

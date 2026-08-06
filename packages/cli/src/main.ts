@@ -2,7 +2,7 @@
 /**
  * amo — the AmoJS CLI (v0.4b).
  *
- * A thin, zero-dependency wrapper over @amojs/compiler:
+ * A thin, zero-dependency wrapper over amojs-compiler:
  *   amo build <src> <out>   → buildDir  (compile amo modules, copy the rest)
  *   amo eject <src> <out>   → ejectDir  (build + hand over the runtime,
  *                                        rewrite imports to relative paths)
@@ -13,7 +13,7 @@
 
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { buildDir, ejectDir } from '@amojs/compiler';
+import { buildDir, ejectDir } from 'amojs-compiler';
 
 const USAGE = `amo — compiles to the vanilla JS you would have written
 
@@ -21,7 +21,7 @@ Usage:
   amo build <src> <out>                 compile amo modules, copy everything else
   amo eject <src> <out> [--runtime <dir>]
                                         build, then hand the runtime over and
-                                        rewrite every "@amojs" import to a
+                                        rewrite every "amojs" import to a
                                         relative path (default dir: amo-runtime)
   amo --help | --version
 `;
@@ -95,7 +95,7 @@ async function main(argv: string[]): Promise<void> {
       `amo eject — ${r.compiled.length} compiled, ${r.copied.length} copied, ` +
         `${r.runtime.length} runtime files → ${outArg} (runtime: ${runtimeDir ?? 'amo-runtime'}/)\n` +
         `runtime taken from ${r.runtimeFrom}\n` +
-        'no bare "@amojs" imports remain — deleting amo changes nothing.\n',
+        'no bare "amojs" imports remain — deleting amo changes nothing.\n',
     );
   }
 }

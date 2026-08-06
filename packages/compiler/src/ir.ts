@@ -8,7 +8,7 @@
  * generated from the same object. It is plain JSON: serializable, cacheable,
  * snapshot-testable, and portable to another compiler implementation.
  *
- * The semantics mirror the runtime's hole rule exactly (@amojs/core html.js):
+ * The semantics mirror the runtime's hole rule exactly (amojs html.js):
  * the runtime is the semantic source of truth (LOCKED RULE #3).
  */
 

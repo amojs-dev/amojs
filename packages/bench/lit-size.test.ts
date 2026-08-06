@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
-import { compileModule } from '@amojs/compiler';
+import { compileModule } from 'amojs-compiler';
 
 const HERE = import.meta.url.startsWith('file:')
   ? dirname(fileURLToPath(import.meta.url))
@@ -32,7 +32,7 @@ const gz = (code: Uint8Array | string) => gzipSync(Buffer.from(code), { level: 9
 
 /** the same app, written the AmoJS way */
 const AMO_APP = [
-  "import { signal, html, mount, each } from '@amojs/core';",
+  "import { signal, html, mount, each } from 'amojs';",
   'export function App(target) {',
   '  const title = signal("t");',
   '  const count = signal(0);',
@@ -82,9 +82,9 @@ test('shipped bytes: the same app in AmoJS vs Lit', async () => {
   try {
     // AmoJS: compile for real, then point the specifiers at the local runtime
     const compiled = compileModule(AMO_APP)
-      .replaceAll("'@amojs/core/runtime'", `'${join(CORE_SRC, 'runtime.js')}'`)
-      .replaceAll('"@amojs/core/compiled"', `"${join(CORE_SRC, 'compiled.js')}"`)
-      .replaceAll("'@amojs/core'", `'${join(CORE_SRC, 'index.js')}'`);
+      .replaceAll("'amojs/runtime'", `'${join(CORE_SRC, 'runtime.js')}'`)
+      .replaceAll('"amojs/compiled"', `"${join(CORE_SRC, 'compiled.js')}"`)
+      .replaceAll("'amojs'", `'${join(CORE_SRC, 'index.js')}'`);
     await writeFile(join(TMP, 'amo.js'), compiled);
     const amoBytes = await bundleBytes(`export * from './amo.js';`, TMP);
 

@@ -1,6 +1,6 @@
 {
-  "name": "@amojs/cli",
-  "version": "0.6.1-dev",
+  "name": "amojs-cli",
+  "version": "0.6.2-dev",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -15,8 +15,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amojs/compiler": "workspace:*",
-    "@amojs/core": "workspace:*"
+    "amojs-compiler": "workspace:*",
+    "amojs": "workspace:*"
   },
   "files": [
     "dist"
