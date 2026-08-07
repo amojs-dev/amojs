@@ -27,7 +27,7 @@
  */
 import { test, expect } from 'vitest';
 import { html as litHtml, render as litRender } from 'lit';
-import { signal, html, mount, flushSync } from 'amojs';
+import { signal, html, mount, flushSync } from '@amojs.dev/core';
 
 /** @returns the number of MutationRecords seen while running `fn` */
 function countMutations(target: Element, fn: () => void): number {

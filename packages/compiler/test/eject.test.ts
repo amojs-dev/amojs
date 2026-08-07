@@ -3,7 +3,7 @@
  * THE EJECT TEST — the v0.4 PASS criterion.
  *
  * A project is ejected and then EXECUTED: the output contains zero bare
- * 'amojs' imports, so module resolution never touches node_modules —
+ * '@amojs.dev/core' imports, so module resolution never touches node_modules —
  * deleting amo can change nothing. The framework you can uninstall,
  * asserted by running the uninstalled result.
  */
@@ -28,9 +28,9 @@ async function write(rel: string, content: string): Promise<void> {
 }
 
 const APP = [
-  "import { signal, html, each, mount } from 'amojs';",
+  "import { signal, html, each, mount } from '@amojs.dev/core';",
   "import { inc } from './util.js';",
-  "export { flushSync } from 'amojs';",
+  "export { flushSync } from '@amojs.dev/core';",
   'export function App() {',
   '  const count = signal(0);',
   '  const items = signal([1, 2]);',
@@ -87,14 +87,14 @@ test('eject: output has zero amojs imports and RUNS without the package', async 
 });
 
 test('eject hands over the PROJECT\'s installed amojs, not the compiler\'s', async () => {
-  // the npm scenario: a project with its own node_modules/amojs. Its
+  // the npm scenario: a project with its own node_modules/@amojs.dev/core. Its
   // copy must win, so the ejected runtime is the version the code was
   // written against. Marker content proves WHICH copy was handed over.
-  await write('npmproj/src/app.js', "import { signal } from 'amojs';\nexport const s = signal(1);");
+  await write('npmproj/src/app.js', "import { signal } from '@amojs.dev/core';\nexport const s = signal(1);");
   await write(
-    'npmproj/node_modules/amojs/package.json',
+    'npmproj/node_modules/@amojs.dev/core/package.json',
     JSON.stringify({
-      name: 'amojs',
+      name: '@amojs.dev/core',
       version: '9.9.9-fake',
       type: 'module',
       exports: {
@@ -105,12 +105,12 @@ test('eject hands over the PROJECT\'s installed amojs, not the compiler\'s', asy
     }),
   );
   for (const f of RUNTIME_FILES) {
-    await write(`npmproj/node_modules/amojs/src/${f}`, `/* installed copy: ${f} */\n`);
+    await write(`npmproj/node_modules/@amojs.dev/core/src/${f}`, `/* installed copy: ${f} */\n`);
   }
 
   const res = await ejectDir(join(TMP, 'npmproj'), join(TMP, 'dist-npm'));
 
-  expect(res.runtimeFrom).toBe(join(TMP, 'npmproj/node_modules/amojs/src'));
+  expect(res.runtimeFrom).toBe(join(TMP, 'npmproj/node_modules/@amojs.dev/core/src'));
   const signalJs = await readFile(join(TMP, 'dist-npm/amo-runtime/signal.js'), 'utf8');
   expect(signalJs).toContain('installed copy: signal.js');
 });
@@ -118,10 +118,10 @@ test('eject hands over the PROJECT\'s installed amojs, not the compiler\'s', asy
 test('eject fails loudly when a runtime file is missing', async () => {
   await write('brokenproj/src/app.js', 'export const n = 1;');
   await write(
-    'brokenproj/node_modules/amojs/package.json',
-    JSON.stringify({ name: 'amojs', version: '0.0.0', type: 'module', exports: { '.': './src/index.js' } }),
+    'brokenproj/node_modules/@amojs.dev/core/package.json',
+    JSON.stringify({ name: '@amojs.dev/core', version: '0.0.0', type: 'module', exports: { '.': './src/index.js' } }),
   );
-  await write('brokenproj/node_modules/amojs/src/index.js', '// only this one exists\n');
+  await write('brokenproj/node_modules/@amojs.dev/core/src/index.js', '// only this one exists\n');
 
   await expect(
     ejectDir(join(TMP, 'brokenproj'), join(TMP, 'dist-broken')),

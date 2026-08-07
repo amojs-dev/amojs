@@ -1,5 +1,5 @@
 {
-  "name": "amojs",
+  "name": "@amojs.dev/core",
   "version": "0.7.0",
   "type": "module",
   "license": "MIT",
@@ -46,5 +46,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

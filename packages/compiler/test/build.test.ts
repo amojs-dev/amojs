@@ -22,7 +22,7 @@ test('buildDir compiles amo modules, copies everything else verbatim', async () 
   await write(
     'proj/src/app.js',
     [
-      "import { signal, html } from 'amojs';",
+      "import { signal, html } from '@amojs.dev/core';",
       'export const el = html`<p>${signal(1)}</p>`;',
     ].join('\n'),
   );

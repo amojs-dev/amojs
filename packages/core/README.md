@@ -22,7 +22,7 @@ is **1.98 KB**.
 ## Install
 
 ```bash
-npm install amojs
+npm install @amojs.dev/core
 ```
 
 Or skip installing altogether — it is plain ESM, so a browser can load it
@@ -30,7 +30,7 @@ directly:
 
 ```html
 <script type="importmap">
-  { "imports": { "amojs": "https://esm.sh/amojs" } }
+  { "imports": { "@amojs.dev/core": "https://esm.sh/@amojs.dev/core" } }
 </script>
 <script type="module" src="./app.js"></script>
 ```
@@ -38,7 +38,7 @@ directly:
 ## The whole idea
 
 ```js
-import { signal, computed, html, mount } from 'amojs';
+import { signal, computed, html, mount } from '@amojs.dev/core';
 
 function Counter() {
   const count = signal(0);
@@ -79,7 +79,7 @@ compared, because nothing needs to be.
 ### Lists
 
 ```js
-import { each } from 'amojs';
+import { each } from '@amojs.dev/core';
 
 html`<ul>${each(items, (item) => item.id, Item)}</ul>`;
 ```
@@ -114,7 +114,7 @@ template, resolves every hole to a positional node walk, and drops the template
 parser from the bundle entirely:
 
 ```bash
-npx amojs-cli build src/ dist/
+npx @amojs.dev/cli build src/ dist/
 ```
 
 Every test fixture in this project runs in **both** modes and asserts identical
@@ -124,11 +124,11 @@ is only allowed to be faster and smaller.
 ## You can uninstall it
 
 ```bash
-npx amojs-cli eject src/ dist/
+npx @amojs.dev/cli eject src/ dist/
 ```
 
 `eject` emits readable vanilla JavaScript, hands over the runtime files, and
-rewrites every `amojs` specifier to a relative path. The test suite executes
+rewrites every `@amojs.dev/core` specifier to a relative path. The test suite executes
 the ejected output and asserts there are zero bare-specifier imports left, so
 module resolution never touches `node_modules` again. Delete AmoJS and the app
 keeps working.
@@ -143,7 +143,7 @@ keeps working.
 | **scheduling** | `flushSync` · `tick` |
 
 Subpath entries for compiled and ejected output, which never load the template
-parser: `amojs/runtime` and `amojs/compiled`.
+parser: `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled`.
 
 ## Status — what is not here
 

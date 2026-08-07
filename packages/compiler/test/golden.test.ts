@@ -17,8 +17,8 @@ afterAll(cleanupFixtures);
 /* ------------------------------------------------------------------ */
 
 const COUNTER = [
-  "import { signal, computed, html } from 'amojs';",
-  "export { flushSync } from 'amojs';",
+  "import { signal, computed, html } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
   'export function Counter() {',
   '  const count = signal(0);',
   '  const double = computed(() => count.value * 2);',
@@ -57,8 +57,8 @@ test('GOLDEN counter: raw and compiled behave identically', async () => {
 /* ------------------------------------------------------------------ */
 
 const TOGGLE = [
-  "import { signal, html } from 'amojs';",
-  "export { flushSync } from 'amojs';",
+  "import { signal, html } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
   'export function Box() {',
   '  const on = signal(false);',
   // disabled goes on a SIBLING input — a disabled button would stop firing clicks
@@ -101,7 +101,7 @@ test('GOLDEN attr + function holes: raw and compiled behave identically', async 
 /* ------------------------------------------------------------------ */
 
 const NESTED = [
-  "import { html } from 'amojs';",
+  "import { html } from '@amojs.dev/core';",
   'export function Wrap() {',
   '  return html`<div>[${html`<em>in</em>`}]</div>`;',
   '}',
@@ -110,8 +110,8 @@ const NESTED = [
 /* ------------------------------------------------------------------ */
 
 const SHIFT = [
-  "import { signal, html } from 'amojs';",
-  "export { flushSync } from 'amojs';",
+  "import { signal, html } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
   'export function App() {',
   '  const a = html`<i>a</i>`;',
   '  const b = html`<i>b</i>`;',
@@ -165,7 +165,7 @@ test('GOLDEN a bad event listener fails identically in both modes', async () => 
   // compiled output routes events through the same runtime helper raw mode
   // uses (_$event), so the error is one implementation, not two that agree.
   const src = [
-    "import { signal, html } from 'amojs';",
+    "import { signal, html } from '@amojs.dev/core';",
     'export const make = (h) => html`<button onclick=${h}>x</button>`;',
     'export const sig = signal(() => {});',
   ].join('\n');

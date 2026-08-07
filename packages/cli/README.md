@@ -1,4 +1,4 @@
-# amojs-cli
+# @amojs.dev/cli
 
 The `amo` binary for [AmoJS](https://github.com/amojs-dev/amojs) — a
 fine-grained UI compiler that produces the vanilla JS you would have written.
@@ -10,13 +10,13 @@ Zero dependencies beyond AmoJS itself. It is two commands.
 ## Install
 
 ```bash
-npm install --save-dev amojs-cli
+npm install --save-dev @amojs.dev/cli
 ```
 
 Or run it without installing:
 
 ```bash
-npx amojs-cli build src/ dist/
+npx @amojs.dev/cli build src/ dist/
 ```
 
 ## Usage
@@ -25,14 +25,14 @@ npx amojs-cli build src/ dist/
 amo build <src> <out>                 compile amo modules, copy everything else
 amo eject <src> <out> [--runtime <dir>]
                                       build, then hand the runtime over and
-                                      rewrite every "amojs" import to a
+                                      rewrite every "@amojs.dev/core" import to a
                                       relative path (default dir: amo-runtime)
 amo --help | --version
 ```
 
 ### `amo build`
 
-Walks the project, compiles every module that imports `amojs`, and copies
+Walks the project, compiles every module that imports `@amojs.dev/core`, and copies
 everything else through untouched. Templates are hoisted and cloned instead of
 parsed at runtime, holes become positional node walks decided at build time,
 and the template parser is dropped from the output entirely.
@@ -49,7 +49,7 @@ amo eject src/ dist/
 ```
 
 The output is readable vanilla JavaScript with the runtime files written to
-`dist/amo-runtime/` and every `amojs` specifier rewritten to a relative path.
+`dist/amo-runtime/` and every `@amojs.dev/core` specifier rewritten to a relative path.
 There are no bare-specifier imports left, so module resolution never touches
 `node_modules` — the project's test suite executes ejected output and asserts
 exactly that.
@@ -58,7 +58,7 @@ Delete AmoJS afterwards and your app keeps working. It is the framework you can
 uninstall.
 
 `--runtime <dir>` renames the runtime folder. The runtime is resolved from the
-**ejected project's own** installed `amojs` when there is one, so the output
+**ejected project's own** installed `@amojs.dev/core` when there is one, so the output
 keeps the exact version the code was written against; the CLI prints where it
 came from.
 

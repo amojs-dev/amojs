@@ -28,12 +28,12 @@ export function resolveSpecifiers(src: string, fromDir: string): string {
   const runtime = rel('runtime.js');
   const helpers = rel('compiled.js');
   return src
-    .replaceAll('"amojs/compiled"', `"${helpers}"`)
-    .replaceAll("'amojs/compiled'", `'${helpers}'`)
-    .replaceAll('"amojs/runtime"', `"${runtime}"`)
-    .replaceAll("'amojs/runtime'", `'${runtime}'`)
-    .replaceAll('"amojs"', `"${core}"`)
-    .replaceAll("'amojs'", `'${core}'`);
+    .replaceAll('"@amojs.dev/core/compiled"', `"${helpers}"`)
+    .replaceAll("'@amojs.dev/core/compiled'", `'${helpers}'`)
+    .replaceAll('"@amojs.dev/core/runtime"', `"${runtime}"`)
+    .replaceAll("'@amojs.dev/core/runtime'", `'${runtime}'`)
+    .replaceAll('"@amojs.dev/core"', `"${core}"`)
+    .replaceAll("'@amojs.dev/core'", `'${core}'`);
 }
 
 export { TMP };

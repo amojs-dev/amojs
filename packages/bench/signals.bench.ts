@@ -12,7 +12,7 @@
 import { bench, describe } from 'vitest';
 import {
   signal as aSignal, computed as aComputed, effect as aEffect, flushSync,
-} from 'amojs/runtime';
+} from '@amojs.dev/core/runtime';
 import {
   createRoot, createSignal, createMemo, createEffect,
 } from 'solid-js/dist/solid.js';

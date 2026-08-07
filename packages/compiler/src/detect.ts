@@ -3,7 +3,7 @@
  *
  * LOCKED RULE #8: target files are identified by the import statement,
  * never by filename. Only tags whose identifier is bound by
- * `import { html [as X] } from 'amojs'` are ours; any other `html`
+ * `import { html [as X] } from '@amojs.dev/core'` are ours; any other `html`
  * (lit-html, a local helper, …) is left untouched.
  *
  * Known v0.2 limitation (documented, acceptable): local shadowing of the
@@ -36,7 +36,7 @@ export interface DetectedTemplate {
 
 /**
  * Parse a JS module and return every `html\`…\`` owned by amojs.
- * Returns [] fast when the module doesn't import from 'amojs'.
+ * Returns [] fast when the module doesn't import from '@amojs.dev/core'.
  */
 export function detectTemplates(source: string): DetectedTemplate[] {
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
@@ -44,7 +44,7 @@ export function detectTemplates(source: string): DetectedTemplate[] {
   const htmlNames = new Set<string>();
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration') continue;
-    if (node.source.value !== 'amojs') continue;
+    if (node.source.value !== '@amojs.dev/core') continue;
     for (const spec of node.specifiers) {
       if (
         spec.type === 'ImportSpecifier' &&

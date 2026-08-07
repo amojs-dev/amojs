@@ -3,7 +3,7 @@ import { detectTemplates } from '../src/detect.js';
 
 test('detects a basic html`` template with strings and expression offsets', () => {
   const src = [
-    `import { html } from 'amojs';`,
+    `import { html } from '@amojs.dev/core';`,
     'const el = html`<p>${x} و ${y}</p>`;',
   ].join('\n');
   const found = detectTemplates(src);
@@ -18,7 +18,7 @@ test('detects a basic html`` template with strings and expression offsets', () =
 
 test('tracks an import alias: import { html as h }', () => {
   const src = [
-    `import { html as h } from 'amojs';`,
+    `import { html as h } from '@amojs.dev/core';`,
     'export const a = h`<i>t</i>`;',
   ].join('\n');
   const found = detectTemplates(src);
@@ -41,7 +41,7 @@ test('ignores a local function named html (no amojs import)', () => {
 
 test('ignores unrelated tagged templates in a file that does import html', () => {
   const src = [
-    `import { html } from 'amojs';`,
+    `import { html } from '@amojs.dev/core';`,
     'const css = (s) => s;',
     'css`p { color: red }`;',
     'const el = html`<p>t</p>`;',
@@ -53,7 +53,7 @@ test('ignores unrelated tagged templates in a file that does import html', () =>
 
 test('finds multiple templates, including one nested inside a hole', () => {
   const src = [
-    `import { html } from 'amojs';`,
+    `import { html } from '@amojs.dev/core';`,
     'const a = html`<div>${html`<em>in</em>`}</div>`;',
     'const b = html`<span>${x}</span>`;',
   ].join('\n');

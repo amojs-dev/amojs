@@ -11,7 +11,7 @@ A complete compiled counter app — runtime included, minified and gzipped — i
 **1.98 KB**.
 
 ```js
-import { signal, computed, html, mount } from 'amojs';
+import { signal, computed, html, mount } from '@amojs.dev/core';
 
 function Counter() {
   const count = signal(0);
@@ -36,10 +36,10 @@ mount(Counter, document.getElementById('app'));
 
 | package | what it is | published |
 |---|---|---|
-| [`amojs`](packages/core) | the runtime — signals, `` html`` ``, `mount`. Plain JS, ships to browsers raw. Subpaths `amojs/runtime` and `amojs/compiled` never load the template parser. | yes |
-| [`amojs-compiler`](packages/compiler) | parse → IR → codegen, plus `build`, `eject` and `diagnose`. TypeScript, runs on node only. | yes |
-| [`amojs-cli`](packages/cli) | the `amo` binary — `amo build`, `amo eject`. | yes |
-| `amojs-bench` | micro-benchmarks. Competitor libraries are quarantined here so the runtime keeps zero dependencies. | never |
+| [`@amojs.dev/core`](packages/core) | the runtime — signals, `` html`` ``, `mount`. Plain JS, ships to browsers raw. Subpaths `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled` never load the template parser. | yes |
+| [`@amojs.dev/compiler`](packages/compiler) | parse → IR → codegen, plus `build`, `eject` and `diagnose`. TypeScript, runs on node only. | yes |
+| [`@amojs.dev/cli`](packages/cli) | the `amo` binary — `amo build`, `amo eject`. | yes |
+| `@amojs.dev/bench` | micro-benchmarks. Competitor libraries are quarantined here so the runtime keeps zero dependencies. | never |
 
 Editor support lives in a separate repository:
 [`amojs-dev/language-tools`](https://github.com/amojs-dev/language-tools) —
@@ -84,7 +84,7 @@ These are locked, and the codebase is shaped by them:
 5. **Browser-shipped code is JS + JSDoc** (type-checked with `tsc --checkJs`);
    **node-only code is TypeScript.**
 6. **No custom file extension.** The compiler finds its targets by the
-   `import … from 'amojs'` statement, never by filename.
+   `import … from '@amojs.dev/core'` statement, never by filename.
 7. **The compiler stays dumb.** It rewrites templates and specifiers and
    touches nothing else — no module-boundary reasoning, no lazy-loading, no
    closure serialization. A local, mechanical rewrite can be trusted next to
@@ -99,7 +99,7 @@ styling solution inside the core.
 ```bash
 pnpm install     # dev tooling only — vitest, happy-dom, esbuild, tsc
 pnpm test        # unit, golden, size, parity and e2e suites
-pnpm build       # compile amojs-compiler and amojs-cli to dist/
+pnpm build       # compile @amojs.dev/compiler and @amojs.dev/cli to dist/
 pnpm check       # build, then type-check everything including JS via JSDoc
 pnpm bench       # reactive-graph micro-benchmarks
 pnpm amo build <src> <out>                     # the CLI, after pnpm build

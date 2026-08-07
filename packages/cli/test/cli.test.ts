@@ -40,7 +40,7 @@ async function write(rel: string, content: string): Promise<void> {
 }
 
 const APP = [
-  "import { signal, html } from 'amojs';",
+  "import { signal, html } from '@amojs.dev/core';",
   'export const el = html`<p>${signal(1)}</p>`;',
 ].join('\n');
 

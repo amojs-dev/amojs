@@ -11,7 +11,7 @@
  * optimization is worth its complexity — with numbers, not vibes.
  */
 import { bench, describe } from 'vitest';
-import { signal, effect, flushSync } from 'amojs/runtime';
+import { signal, effect, flushSync } from '@amojs.dev/core/runtime';
 
 function textNodes(n: number): Text[] {
   const host = document.createElement('div');

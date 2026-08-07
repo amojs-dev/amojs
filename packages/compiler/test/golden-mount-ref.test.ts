@@ -14,8 +14,8 @@ import { load, cleanupFixtures } from './harness.js';
 afterAll(cleanupFixtures);
 
 const FIXTURE = [
-  "import { signal, html, mount, onMount, each } from 'amojs';",
-  "export { flushSync, mount } from 'amojs';",
+  "import { signal, html, mount, onMount, each } from '@amojs.dev/core';",
+  "export { flushSync, mount } from '@amojs.dev/core';",
   'export function App() {',
   '  const log = [];',
   '  const items = signal([1, 2]);',

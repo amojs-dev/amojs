@@ -11,7 +11,7 @@ import { diagnose } from '../src/diagnose.js';
 const marked = (src: string) =>
   diagnose(src).map((d) => ({ message: d.message, text: src.slice(d.start, d.end), exact: d.exact }));
 
-const IMPORT = "import { html } from 'amojs';\n";
+const IMPORT = "import { html } from '@amojs.dev/core';\n";
 
 test('a clean file reports nothing', () => {
   expect(diagnose(`${IMPORT}export const el = html\`<p>hi</p>\`;`)).toEqual([]);

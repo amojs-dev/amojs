@@ -1,5 +1,5 @@
 {
-  "name": "amojs-compiler",
+  "name": "@amojs.dev/compiler",
   "version": "0.7.0",
   "type": "module",
   "license": "MIT",
@@ -40,7 +40,10 @@
     "dist"
   ],
   "dependencies": {
-    "amojs": "workspace:*",
+    "@amojs.dev/core": "workspace:*",
     "acorn": "^8.18.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

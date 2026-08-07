@@ -48,16 +48,16 @@ const HERE = import.meta.url.startsWith('file:')
 /**
  * Where to copy the runtime FROM.
  *
- * The project being ejected wins: its installed `amojs` is the version
+ * The project being ejected wins: its installed `@amojs.dev/core` is the version
  * its code was written against, so that is the copy the user gets to keep.
- * Then the compiler's own install (`npx amojs-cli` in a project without the
+ * Then the compiler's own install (`npx @amojs.dev/cli` in a project without the
  * dependency). Then the dev-phase workspace layout.
  */
 function findCoreSrc(projectDir: string): string {
   for (const base of [projectDir, HERE]) {
     try {
       // resolve() honors the package's `exports` map: "." → src/index.js
-      return dirname(createRequire(join(base, 'noop.js')).resolve('amojs'));
+      return dirname(createRequire(join(base, 'noop.js')).resolve('@amojs.dev/core'));
     } catch {
       // not installed from here — keep looking
     }
@@ -105,12 +105,12 @@ export async function ejectDir(
     let prefix = relative(dirname(join(outDir, rel)), rtOut).split('\\').join('/');
     if (!prefix.startsWith('.')) prefix = `./${prefix}`;
     const out = source
-      .replaceAll('"amojs/compiled"', `"${prefix}/compiled.js"`)
-      .replaceAll("'amojs/compiled'", `'${prefix}/compiled.js'`)
-      .replaceAll('"amojs/runtime"', `"${prefix}/runtime.js"`)
-      .replaceAll("'amojs/runtime'", `'${prefix}/runtime.js'`)
-      .replaceAll('"amojs"', `"${prefix}/index.js"`)
-      .replaceAll("'amojs'", `'${prefix}/index.js'`);
+      .replaceAll('"@amojs.dev/core/compiled"', `"${prefix}/compiled.js"`)
+      .replaceAll("'@amojs.dev/core/compiled'", `'${prefix}/compiled.js'`)
+      .replaceAll('"@amojs.dev/core/runtime"', `"${prefix}/runtime.js"`)
+      .replaceAll("'@amojs.dev/core/runtime'", `'${prefix}/runtime.js'`)
+      .replaceAll('"@amojs.dev/core"', `"${prefix}/index.js"`)
+      .replaceAll("'@amojs.dev/core'", `'${prefix}/index.js'`);
     if (out !== source) await writeFile(file, out);
   }
 
