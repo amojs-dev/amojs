@@ -5,7 +5,7 @@
   "type": "module",
   "description": "AmoJS micro-benchmarks — never published. Competitor libraries live here so the runtime keeps zero dependencies.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "@amojs.dev/compiler": "workspace:*",

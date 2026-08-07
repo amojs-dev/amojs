@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the first — no point finishing a run
+# whose commit is already superseded.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check + test
+    runs-on: ubuntu-latest
+    # NOT 20, even though `engines` declares node >= 20: pnpm 11 imports
+    # node:sqlite, which only exists from Node 22.5. That is a limitation of our
+    # dev tooling, not of the packages — the published packages were verified by
+    # hand on Node 20 (npm install, runtime, `amo build`, `amo eject`).
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `check` builds the compiler and CLI to dist/ and then type-checks
+      # everything, including the browser JS through its JSDoc.
+      - run: pnpm check
+
+      # The suite is where the promises live: size budgets, the identity
+      # benchmark, DOM-work parity, and every golden fixture run in both
+      # raw and compiled mode.
+      - run: pnpm test

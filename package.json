@@ -4,7 +4,7 @@
   "type": "module",
   "description": "AmoJS monorepo — a fine-grained UI compiler that writes the vanilla JS you would have written.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "pnpm -r run build",

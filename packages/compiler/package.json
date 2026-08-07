@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/compiler",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS compiler — parse → IR → codegen. Runs on node only; never ships to browsers.",
@@ -31,7 +31,7 @@
     }
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
