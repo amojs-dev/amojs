@@ -23,10 +23,11 @@
 import { isSignal, root, onDispose } from './signal.js';
 
 /**
- * @param {{ value: unknown } | (() => any[])} source  a signal holding an
- *   array, or a function returning one
- * @param {(item: any, index: number) => unknown} key  stable identity per item
- * @param {(item: any, index: number) => Node} render  built once per key
+ * @template T
+ * @param {{ value: readonly T[] } | (() => readonly T[])} source  a signal
+ *   holding an array, or a function returning one
+ * @param {(item: T, index: number) => unknown} key  stable identity per item
+ * @param {(item: T, index: number) => Node} render  built once per key
  * @returns {() => Node[]}
  */
 export function each(source, key, render) {

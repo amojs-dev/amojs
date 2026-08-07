@@ -33,10 +33,11 @@ const DIRTY = 2;
 
 const UNSET = Symbol();
 
+/** @template [T=unknown] */
 export class Signal {
-  /** @param {*} value */
+  /** @param {T} value */
   constructor(value) {
-    /** @private */
+    /** @type {T} current value (module-internal, not public API) */
     this._v = value;
     /** write version of the last actual change */
     this.wv = 0;
@@ -44,11 +45,13 @@ export class Signal {
     this.subs = new Set();
   }
 
+  /** @returns {T} */
   get value() {
     track(this);
     return this._v;
   }
 
+  /** @param {T} next */
   set value(next) {
     if (Object.is(next, this._v)) return; // cutoff at the source
     this._v = next;
@@ -56,18 +59,22 @@ export class Signal {
     for (const r of this.subs) mark(r, DIRTY);
   }
 
-  /** Read the current value without subscribing. */
+  /**
+   * Read the current value without subscribing.
+   * @returns {T}
+   */
   peek() {
     return this._v;
   }
 }
 
+/** @template [T=unknown] */
 export class Computed {
-  /** @param {() => *} fn */
+  /** @param {() => T} fn */
   constructor(fn) {
     /** the user computation (module-internal, not public API) */
     this._fn = fn;
-    /** @type {*} cached value (module-internal, not public API) */
+    /** @type {T | typeof UNSET} cached value (module-internal, not public API) */
     this._v = UNSET;
     /** write version of the last actual value change */
     this.wv = 0;
@@ -82,16 +89,20 @@ export class Computed {
     if (activeOwner) (activeOwner.children ??= []).push(this);
   }
 
+  /** @returns {T} */
   get value() {
     track(this);
     refresh(this);
-    return this._v;
+    return /** @type {T} */ (this._v);
   }
 
-  /** Read (recomputing if needed) without subscribing. */
+  /**
+   * Read (recomputing if needed) without subscribing.
+   * @returns {T}
+   */
   peek() {
     refresh(this);
-    return this._v;
+    return /** @type {T} */ (this._v);
   }
 }
 
@@ -405,7 +416,9 @@ export function tick() {
 
 /**
  * Create a reactive value.
- * @param {*} initial
+ * @template T
+ * @param {T} initial
+ * @returns {Signal<T>}
  */
 export function signal(initial) {
   return new Signal(initial);
@@ -414,7 +427,9 @@ export function signal(initial) {
 /**
  * Create a lazy, cached derivation. It never computes until read, and it
  * never wakes its subscribers when a recompute produces an equal value.
- * @param {() => *} fn
+ * @template T
+ * @param {() => T} fn
+ * @returns {Computed<T>}
  */
 export function computed(fn) {
   return new Computed(fn);
@@ -422,7 +437,7 @@ export function computed(fn) {
 
 /**
  * Run `fn` now, then re-run it whenever anything it read changes.
- * @param {() => *} fn
+ * @param {() => unknown} fn
  * @returns {() => void} dispose
  */
 export function effect(fn) {
@@ -485,7 +500,7 @@ export function onDispose(fn) {
 
 /**
  * True for values created by `signal()` or `computed()`.
- * @param {*} v
+ * @param {unknown} v
  * @returns {v is Signal | Computed}
  */
 export function isSignal(v) {

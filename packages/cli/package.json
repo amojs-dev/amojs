@@ -1,10 +1,24 @@
 {
   "name": "amojs-cli",
-  "version": "0.6.2-dev",
-  "private": true,
+  "version": "0.7.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS CLI — `amo build`, `amo eject`. The framework you can uninstall.",
+  "keywords": [
+    "amojs",
+    "cli",
+    "build",
+    "eject",
+    "compiler"
+  ],
+  "homepage": "https://amojs.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amojs-dev/amojs.git",
+    "directory": "packages/cli"
+  },
+  "bugs": "https://github.com/amojs-dev/amojs/issues",
+  "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
   "bin": {
     "amo": "./dist/main.js"
   },

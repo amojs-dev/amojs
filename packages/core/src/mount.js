@@ -13,6 +13,7 @@ import { root, flushMount } from './signal.js';
  * anywhere in it; for an explicitly disposable app, wrap mount in root().
  * @param {(() => Node) | Node} component
  * @param {Element} target
+ * @returns {Node}
  */
 export function mount(component, target) {
   const node =

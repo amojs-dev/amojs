@@ -38,7 +38,7 @@ const cache = new WeakMap();
 /**
  * Build a live DOM node from a template literal.
  * @param {TemplateStringsArray} strings
- * @param {...*} values
+ * @param {...unknown} values
  * @returns {Node}
  */
 export function html(strings, ...values) {
