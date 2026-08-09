@@ -51,6 +51,9 @@ export function compileRoutes(routes) {
  * @returns {{ load: T, params: Record<string, string> } | null}
  */
 export function matchRoute(compiled, path) {
+  // '/products' and '/products/' are one route — trailing-slash ambiguity is
+  // a recurring bug (and SEO duplicate-content) class in other routers
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
   for (const r of compiled.table) {
     const m = r.rx.exec(path);
     if (m) {

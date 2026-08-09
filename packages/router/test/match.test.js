@@ -42,6 +42,12 @@ test('route characters are literal — a dot is a dot', () => {
   expect(matchRoute(routes, '/fileXtxt')).toEqual({ load: 'missing', params: {} });
 });
 
+test('trailing slash is normalized — /users/ is /users; root stays root', () => {
+  expect(matchRoute(routes, '/users/')).toEqual({ load: 'users', params: {} });
+  expect(matchRoute(routes, '/users/42/')).toEqual({ load: 'user', params: { id: '42' } });
+  expect(matchRoute(routes, '/')).toEqual({ load: 'home', params: {} });
+});
+
 test('"*" catches everything unmatched; without it the result is null', () => {
   expect(matchRoute(routes, '/nowhere')).toEqual({ load: 'missing', params: {} });
   const bare = compileRoutes({ '/': 'home' });

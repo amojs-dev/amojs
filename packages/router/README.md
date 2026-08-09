@@ -25,12 +25,19 @@ mount(app, document.getElementById('app'));
 
 ```js
 // pages/user.js
-export async function load({ params, signal }) {
+export async function load({ params, searchParams, signal }) {
   return (await fetch(`/api/users/${params.id}`, { signal })).json();
 }
 export const title = (data) => data.name;
 export default ({ data }) => html`<h1>${data.name}</h1>`;
 ```
+
+`load`, `action` and the page component all receive `searchParams` (a
+`URLSearchParams`) alongside `params`. It is captured from the navigation's
+own URL, **not** from `location` — so a page superseded mid-load can never
+read the newer navigation's query by accident. Navigating to the same path
+with a different query re-runs `load`, which makes `?page=2`-style pagination
+just work.
 
 ## The one idea everything rests on
 
@@ -95,5 +102,5 @@ No `<Link>` component — an `<a>` is already the router's link.
 The outlet is built the way compiled AmoJS output builds a child hole
 (an anchor + `bindChild`), so an app that routes — compiled or raw — never
 loads the template parser through this package. Size is gated in CI at
-≤ 1152 B min+gz. `amo eject` hands the router over along with the runtime:
+≤ 1328 B min+gz. `amo eject` hands the router over along with the runtime:
 the ejected app keeps routing with the package deleted.

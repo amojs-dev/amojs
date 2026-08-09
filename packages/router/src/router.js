@@ -23,11 +23,11 @@ import { compileRoutes, matchRoute, stripBase } from './match.js';
  * @typedef {Record<string, string>} Params
  *
  * @typedef {Object} PageModule
- * @property {(ctx: { data: *, params: Params }) => Node} default
+ * @property {(ctx: { data: *, params: Params, searchParams: URLSearchParams }) => Node} default
  *   the page component — receives RESOLVED data, never a promise
- * @property {(ctx: { params: Params, signal?: AbortSignal }) => *} [load]
+ * @property {(ctx: { params: Params, searchParams: URLSearchParams, signal?: AbortSignal }) => *} [load]
  *   fetch the page's data; the navigation's AbortSignal cancels stale runs
- * @property {(ctx: { formData: FormData, params: Params, signal?: AbortSignal }) => *} [action]
+ * @property {(ctx: { formData: FormData, params: Params, searchParams: URLSearchParams, signal?: AbortSignal }) => *} [action]
  *   handle a same-URL <form method="post"> submit
  * @property {string | ((data: *) => string)} [title]  document.title for the page
  *
@@ -79,30 +79,42 @@ export function router(routes, { base = '', pending, error, viewTransitions = fa
     prev?.(); // the old page's scope dies the moment the new one is in place
   };
 
+  /** consecutive load/action redirects — reset by any page that RENDERS */
+  let hops = 0;
+  /** @param {string} to */
+  const go = (to) => {
+    // a redirect loop in `load` churns history forever with zero diagnostics
+    // in most routers — cap it and name both ends (fetch itself caps at ~20)
+    if (++hops > 10) throw new Error(`amo router: redirect loop — ${location.pathname} → ${base + to}`);
+    navigation.navigate(base + to, { history: 'replace' });
+  };
+
   /**
    * @param {{ load: Loader, params: Params }} m
+   * @param {URLSearchParams} sp  captured from the navigation's OWN url — never
+   *   from `location`, which may already belong to a newer navigation
    * @param {{ signal?: AbortSignal, formData?: FormData | null }} [nav]
    */
-  async function run(m, { signal: abort, formData } = {}) {
+  async function run(m, sp, { signal: abort, formData } = {}) {
     // the old page stays on screen; pending appears only when the wait is real,
     // so a fast page swaps old → new directly with no flash in between
     const slow = pending && setTimeout(() => swap(pending), 100);
     try {
       const mod = await m.load();
       if (formData && mod.action) {
-        const r = await mod.action({ formData, params: m.params, signal: abort });
-        if (r && r.__redirect) {
-          navigation.navigate(base + r.__redirect, { history: 'replace' });
-          return;
-        }
+        const r = await mod.action({ formData, params: m.params, searchParams: sp, signal: abort });
+        if (r && r.__redirect) return go(r.__redirect);
       }
-      const data = mod.load ? await mod.load({ params: m.params, signal: abort }) : undefined;
+      const data = mod.load
+        ? await mod.load({ params: m.params, searchParams: sp, signal: abort })
+        : undefined;
       const r = data && data.__redirect;
-      if (r) {
-        navigation.navigate(base + r, { history: 'replace' });
-        return;
-      }
-      const show = () => swap(() => mod.default({ data, params: m.params }));
+      if (r) return go(r);
+      // a load without a fetch never rejects on abort — never render a page
+      // whose navigation has already been superseded
+      if (abort && abort.aborted) return;
+      hops = 0;
+      const show = () => swap(() => mod.default({ data, params: m.params, searchParams: sp }));
       // opt-in, guarded: a browser without View Transitions swaps instantly.
       // The swap MUST be awaited: startViewTransition defers its callback, and
       // if run() settles before the DOM is in place, the platform restores
@@ -116,6 +128,7 @@ export function router(routes, { base = '', pending, error, viewTransitions = fa
       if (mod.title) document.title = typeof mod.title === 'function' ? mod.title(data) : mod.title;
     } catch (err) {
       if (abort && abort.aborted) return; // superseded — the newer navigation owns the outlet
+      hops = 0; // the chain ended here — a later redirect starts fresh
       if (!error) throw err;
       // the previous page's title must not linger on the error UI; the
       // message is the default, and error() may overwrite document.title
@@ -133,12 +146,12 @@ export function router(routes, { base = '', pending, error, viewTransitions = fa
     const path = stripBase(url.pathname, base);
     const m = path == null ? null : matchRoute(compiled, path);
     if (!m) return; // not ours — the browser navigates for real
-    e.intercept({ handler: () => run(m, e) });
+    e.intercept({ handler: () => run(m, url.searchParams, e) });
   });
 
   // the Navigation API does not fire for the page already open — render it by hand
   const m0 = matchRoute(compiled, stripBase(location.pathname, base) ?? '/');
-  if (m0) run(m0);
+  if (m0) run(m0, new URL(location.href).searchParams);
 
   // the outlet, built the way compiled output builds a child hole — no parser
   return () => {
