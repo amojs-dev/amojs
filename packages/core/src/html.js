@@ -87,31 +87,34 @@ function compile(strings) {
   }
   tpl.innerHTML = text;
 
-  /** @type {{ node: Node, kind: Binding['kind'], index: number, name: string }[]} */
+  /** @type {(Binding & { node: Node })[]} */
   const found = [];
   collect(tpl.content, found);
 
+  /* Every hole must have been seen. Markers inside <template> (parsed into
+     .content), rawtext content, a comment, or a tag-name position sit where
+     the walker never looks — the binding would silently vanish. The compiler
+     names each case precisely at build time; raw mode groups them. */
+  if (found.length !== strings.length - 1) {
+    throw new Error('amo: a hole in an unsupported spot (<template>, rawtext, comment, tag)');
+  }
+
   // Paths are computed only after all text splitting is done.
-  const bindings = found.map((f) => ({
-    kind: f.kind,
-    index: f.index,
-    name: f.name,
-    path: pathOf(f.node, tpl.content),
-  }));
+  for (const f of found) f.path = pathOf(f.node, tpl.content);
 
   /* Children first. An element's live properties must be set AFTER its
      children exist — `<select value=${x}>` cannot select an <option> that has
      not been inserted yet — and that is also the order a human writes:
      build the subtree, then set the property. Sort is stable, so document
      order is preserved within each group. */
-  bindings.sort((a, b) => (a.kind === 'child' ? 0 : 1) - (b.kind === 'child' ? 0 : 1));
+  found.sort((a, b) => +(a.kind !== 'child') - +(b.kind !== 'child'));
 
-  return { tpl, bindings };
+  return { tpl, bindings: found };
 }
 
 /**
  * @param {Node} root
- * @param {{ node: Node, kind: Binding['kind'], index: number, name: string }[]} found
+ * @param {(Binding & { node: Node })[]} found
  */
 function collect(root, found) {
   // snapshot: splitting text nodes mutates the child list
@@ -120,7 +123,15 @@ function collect(root, found) {
       splitText(/** @type {Text} */ (child), found);
     } else if (child.nodeType === 1 /* ELEMENT */) {
       scanAttributes(/** @type {Element} */ (child), found);
-      collect(child, found);
+      /* rawtext content (script/style/textarea/title) is ONE inert text node
+         — never descend into it: a hole there could only be a default value,
+         never a binding, so its marker must stay unfound and trip the count
+         check in compile(). Attribute holes on the element itself
+         (value="${…}") are the supported form. tagName is UPPERCASE only for
+         HTML elements, so <svg><title> stays walkable (ordinary markup). */
+      if (!/^(SCRIPT|STYLE|TEXTAREA|TITLE)$/.test(/** @type {Element} */ (child).tagName)) {
+        collect(child, found);
+      }
     }
   }
 }
@@ -129,7 +140,7 @@ function collect(root, found) {
  * Turn `a <marker:0> b` into: text("a "), placeholder(), text(" b") — one
  * empty text node per hole, recorded as a child binding.
  * @param {Text} textNode
- * @param {{ node: Node, kind: Binding['kind'], index: number, name: string }[]} found
+ * @param {(Binding & { node: Node })[]} found
  */
 function splitText(textNode, found) {
   const data = textNode.data;
@@ -140,23 +151,23 @@ function splitText(textNode, found) {
     if (!m && part === '') continue;
     const n = document.createTextNode(m ? '' : part);
     parent.insertBefore(n, textNode);
-    if (m) found.push({ node: n, kind: 'child', index: Number(m[1]), name: '' });
+    if (m) found.push({ node: n, kind: 'child', index: Number(m[1]), name: '', path: [] });
   }
   parent.removeChild(textNode);
 }
 
 /**
  * @param {Element} el
- * @param {{ node: Node, kind: Binding['kind'], index: number, name: string }[]} found
+ * @param {(Binding & { node: Node })[]} found
  */
 function scanAttributes(el, found) {
   for (const attr of [...el.attributes]) {
     const m = attr.value.match(EXACT_RE);
     if (!m) {
-      if (MARKER_RE.test(attr.value) || MARKER_RE.test(attr.name)) {
-        throw new Error(
-          `amo: a hole must be the entire attribute value (offending attribute: "${attr.name}")`,
-        );
+      // a marker in an attribute NAME needs no test of its own: that hole is
+      // never counted, so the compile() count check reports it
+      if (MARKER_RE.test(attr.value)) {
+        throw new Error(`amo: a hole must be the entire attribute value ("${attr.name}")`);
       }
       continue;
     }
@@ -164,9 +175,9 @@ function scanAttributes(el, found) {
     const name = attr.name; // the HTML parser lowercases: onClick → onclick
     el.removeAttribute(name);
     if (name.startsWith('on')) {
-      found.push({ node: el, kind: 'event', index, name: name.slice(2) });
+      found.push({ node: el, kind: 'event', index, name: name.slice(2), path: [] });
     } else {
-      found.push({ node: el, kind: 'attr', index, name });
+      found.push({ node: el, kind: 'attr', index, name, path: [] });
     }
   }
 }

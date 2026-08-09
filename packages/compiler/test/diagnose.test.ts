@@ -57,10 +57,15 @@ test('self-closing a non-void element underlines the slash', () => {
   expect(out[0].text).toBe('/>');
 });
 
-test('a rawtext element underlines the tag', () => {
-  expect(marked(`${IMPORT}const el = html\`<script>a</script>\`;`)).toEqual([
-    { message: '<script> is not supported inside templates', text: '<script>', exact: true },
-  ]);
+test('static rawtext content is legal; a hole inside it underlines the hole', () => {
+  // static content: no diagnostics at all (rawtext is supported since the
+  // gallery/probe round — state binds through value="${…}")
+  expect(marked(`${IMPORT}const el = html\`<script>a</script>\`;`)).toEqual([]);
+
+  const out = marked(`${IMPORT}const el = html\`<textarea>\${x}</textarea>\`;`);
+  expect(out).toHaveLength(1);
+  expect(out[0].message).toMatch(/bind value="\$\{…\}" instead/);
+  expect(out[0].text).toBe('${x}'); // the hole, per the part-end convention
 });
 
 test('a partial attribute value underlines where the value continues', () => {

@@ -123,3 +123,43 @@ test('a re-running attr hole skips the DOM write when the value is unchanged', (
   expect(mo.takeRecords()).toHaveLength(0);
   mo.disconnect();
 });
+
+/* ------------------------------------------------------------------ */
+/* unreachable-hole guard + rawtext semantics (the lab's probe findings) */
+
+test('rawtext: <textarea> with static content and a value binding works', () => {
+  const note = signal('hi');
+  const el = /** @type {HTMLElement} */ (
+    html`<div><textarea rows="2" value="${note}">fallback</textarea></div>`
+  );
+  mount(el, document.body);
+  const ta = /** @type {HTMLTextAreaElement} */ (el.querySelector('textarea'));
+  expect(ta.textContent).toBe('fallback'); // static default, untouched
+  expect(ta.value).toBe('hi'); // the property is the binding
+  note.value = 'بعد';
+  flushSync();
+  expect(ta.value).toBe('بعد');
+});
+
+test('rawtext: a hole inside <textarea> content throws', () => {
+  const x = signal('a');
+  expect(() => html`<textarea>${x}</textarea>`).toThrow(/unsupported spot/);
+});
+
+test('a hole inside <template> throws instead of silently vanishing', () => {
+  const x = signal('a');
+  expect(() => html`<template><p>${x}</p></template>`).toThrow(/unsupported spot/);
+});
+
+test('static <template> content is legal and lands in .content', () => {
+  const el = /** @type {HTMLElement} */ (html`<div><template><p>x</p></template>${'t'}</div>`);
+  const tpl = /** @type {HTMLTemplateElement} */ (el.querySelector('template'));
+  expect(tpl.content.querySelector('p')?.textContent).toBe('x');
+});
+
+test('svg <title> is ordinary markup — a hole inside it binds', () => {
+  const t = signal('chart');
+  const el = /** @type {HTMLElement} */ (html`<svg><title>${t}</title></svg>`);
+  mount(el, document.body);
+  expect(/** @type {Element} */ (el.querySelector('title')).textContent).toBe('chart');
+});

@@ -196,3 +196,39 @@ test('GOLDEN a bad event listener fails identically in both modes', async () => 
     expect(n).toBe(1);
   }
 });
+
+/* ------------------------------------------------------------------ */
+
+const TEXTAREA = [
+  "import { signal, html } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
+  'export function Box() {',
+  "  const note = signal('hi');",
+  '  const el = html`<div><textarea rows="2" value="${note}">fallback</textarea><p>${note}</p></div>`;',
+  '  return { el, note };',
+  '}',
+].join('\n');
+
+async function runTextarea(src: string) {
+  const mod = await load(src);
+  const { el, note } = mod.Box();
+  document.body.append(el);
+  const ta = el.querySelector('textarea');
+  const before = { value: ta.value, def: ta.textContent, p: el.querySelector('p').textContent };
+  note.value = 'edited';
+  mod.flushSync();
+  return { before, value: ta.value, def: ta.textContent, rows: ta.getAttribute('rows') };
+}
+
+test('GOLDEN textarea: static default + value binding, identical in both modes', async () => {
+  const compiled = compileModule(TEXTAREA);
+  expect(compiled).not.toContain('html`');
+
+  const raw = await runTextarea(TEXTAREA);
+  const cmp = await runTextarea(compiled);
+
+  expect(cmp).toEqual(raw);
+  expect(raw.before).toEqual({ value: 'hi', def: 'fallback', p: 'hi' }); // sanity
+  expect(raw.value).toBe('edited');
+  expect(raw.def).toBe('fallback'); // the DEFAULT never tracks — value does
+});

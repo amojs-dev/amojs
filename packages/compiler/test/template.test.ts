@@ -223,8 +223,92 @@ test('throws: self-closing a non-void element', () => {
   expect(() => parseTemplate(['<div/>'])).toThrow(/self-closing/);
 });
 
-test('throws: rawtext elements are not supported', () => {
-  expect(() => parseTemplate(['<script>a</script>'])).toThrow(/not supported/);
+/* ------------------------------------------------------------------ */
+/* rawtext elements: legal with STATIC content; holes go through value  */
+
+test('textarea with static content: content emitted verbatim, no children parsed', () => {
+  expect(parseTemplate(['<textarea rows="2">a <b> & </textarea>'])).toEqual({
+    html: '<textarea rows="2">a <b> & </textarea>',
+    holes: [],
+    singleRootIndex: 0,
+  });
+});
+
+test('textarea with a value attribute hole: the supported form', () => {
+  expect(parseTemplate(['<textarea value="', '"></textarea>'])).toEqual({
+    html: '<textarea></textarea>',
+    holes: [{ kind: 'attr', expr: 0, name: 'value', path: [0] }],
+    singleRootIndex: 0,
+  });
+});
+
+test('script/style/title: static content is legal, emitted verbatim', () => {
+  expect(parseTemplate(['<style>p { color: red }</style>']).html).toBe(
+    '<style>p { color: red }</style>',
+  );
+  expect(parseTemplate(['<title>a < b</title>']).html).toBe('<title>a < b</title>');
+});
+
+test('a sibling hole AFTER a rawtext element keeps a correct path', () => {
+  expect(parseTemplate(['<div><textarea>x</textarea><p>', '</p></div>'])).toEqual({
+    html: '<div><textarea>x</textarea><p><!----></p></div>',
+    holes: [{ kind: 'child', expr: 0, path: [0, 1, 0] }],
+    singleRootIndex: 0,
+  });
+});
+
+test('throws: a hole inside <textarea> content names the cure', () => {
+  expect(() => parseTemplate(['<textarea>', '</textarea>'])).toThrow(
+    /bind value="\$\{…\}" instead/,
+  );
+});
+
+test('throws: a hole inside <style> content', () => {
+  expect(() => parseTemplate(['<style>p{color:', '}</style>'])).toThrow(/rawtext content is static/);
+});
+
+test('throws: unclosed rawtext element', () => {
+  expect(() => parseTemplate(['<textarea>abc'])).toThrow(/unclosed <textarea>/);
+});
+
+test('svg <title> stays ordinary markup — holes inside are legal', () => {
+  expect(parseTemplate(['<svg><title>', '</title></svg>']).holes).toEqual([
+    { kind: 'child', expr: 0, path: [0, 0, 0] },
+  ]);
+});
+
+/* ------------------------------------------------------------------ */
+/* implied-tbody and template holes: the lab's probe findings           */
+
+test('throws: <tr> directly inside <table> names the cure', () => {
+  expect(() => parseTemplate(['<table><tr><td>', '</td></tr></table>'])).toThrow(
+    /wrap rows in <tbody>/,
+  );
+});
+
+test('<tr> inside <tbody>/<thead>/<tfoot> is fine', () => {
+  expect(() =>
+    parseTemplate(['<table><tbody><tr><td>', '</td></tr></tbody></table>']),
+  ).not.toThrow();
+});
+
+test('throws: a child hole inside <template>', () => {
+  expect(() => parseTemplate(['<template><p>', '</p></template>'])).toThrow(
+    /inside <template>/,
+  );
+});
+
+test('throws: an attribute hole inside <template>', () => {
+  expect(() => parseTemplate(['<template><p class="', '"></p></template>'])).toThrow(
+    /inside <template>/,
+  );
+});
+
+test('static <template> content is legal; an attr hole ON <template> itself too', () => {
+  expect(() => parseTemplate(['<template><p>x</p></template>'])).not.toThrow();
+  expect(parseTemplate(['<template id="', '"><p>x</p></template>']).holes).toEqual([
+    { kind: 'attr', expr: 0, name: 'id', path: [0] },
+  ]);
 });
 
 test('throws: hole inside a comment', () => {

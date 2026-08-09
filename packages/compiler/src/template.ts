@@ -11,9 +11,13 @@
  * Strict subset — the compiler THROWS where a browser would silently guess:
  *   - every non-void element needs an explicit closing tag
  *   - self-closing syntax on non-void elements (`<div/>`) is an error
- *   - rawtext elements (script/style/textarea/title) are not allowed
+ *   - rawtext elements (script/style/textarea/title) carry STATIC content
+ *     only — their body is one inert text node, so a hole inside could never
+ *     bind; <textarea> state binds through value="${…}" like every control
  *   - an attribute hole must be the entire attribute value
  *   - holes cannot appear in tag-name or attribute-name position
+ *   - a hole cannot sit inside <template> (children live in .content)
+ *   - <tr> needs <tbody>/<thead>/<tfoot> — never <table> directly
  *
  * FOREIGN CONTENT (svg/math) plays by different rules, and the browser applies
  * them too — so we must, or a template that works with no build would break
@@ -136,6 +140,23 @@ class Parser {
     throw new TemplateError(msg, part, offset);
   }
 
+  /* A hole anywhere inside <template> can never bind: the browser parses
+     template children into `.content`, which positional childNodes walks
+     (compiled) and the marker walker (raw) both never enter. Found by the
+     lab's probes — compiled crashed, raw silently dropped the binding.
+     Static content inside <template> stays legal; it is one child node
+     either way. The check runs where holes are RECORDED, so it covers
+     child, attribute and event holes alike. */
+  private failIfInTemplate(part: number): void {
+    if (this.stack.some((f) => f.tag === 'template' && !f.foreign)) {
+      this.fail(
+        'a hole cannot sit inside <template> — its children live in .content, where bindings never reach',
+        part,
+        this.strings[part].length,
+      );
+    }
+  }
+
   parse(): TemplateIR {
     for (let p = 0; p < this.strings.length; p++) {
       const s = this.strings[p];
@@ -200,6 +221,7 @@ class Parser {
       );
     }
     const f = this.top();
+    this.failIfInTemplate(p);
     this.textOpen = false;
     // an empty comment marks the spot: it keeps adjacent static text nodes
     // apart through serialize→parse, so NodePaths stay valid. Consumers swap
@@ -258,8 +280,16 @@ class Parser {
         // an <svg>/<math> anywhere opens foreign content; inside it, rawtext
         // does not exist — <svg><title>Chart</title></svg> is ordinary markup
         const foreign = parent.foreign || FOREIGN_ROOTS.has(tag);
-        if (!foreign && RAWTEXT.has(tag)) {
-          this.fail(`<${tag}> is not supported inside templates`, p, i);
+        /* The browser inserts an implied <tbody> around a bare <tr> on
+           reparse, which shifts every NodePath computed here — raw mode
+           would work while compiled crashes (found by the lab's probes).
+           Rejecting loudly beats modeling the browser's implied-tag rules. */
+        if (!foreign && tag === 'tr' && parent.tag === 'table') {
+          this.fail(
+            '<tr> cannot sit directly inside <table> — wrap rows in <tbody> (or <thead>/<tfoot>)',
+            p,
+            i,
+          );
         }
         this.textOpen = false;
         const path = [...parent.path, parent.count++];
@@ -305,6 +335,12 @@ class Parser {
 
       if (ch === '>') {
         this.html += `<${el.emit}${el.attrs}>`;
+        // a rawtext element owns everything to its closing tag — no child
+        // parsing, no frame; its content is ONE inert text node either way
+        if (!el.foreign && RAWTEXT.has(el.tag)) {
+          this.el = null;
+          return this.scanRawText(el, s, i + 1, p);
+        }
         // foreign content has no void elements: <circle> still needs </circle>
         if (el.foreign || !VOID.has(el.tag)) {
           this.stack.push({
@@ -389,7 +425,36 @@ class Parser {
     return i;
   }
 
+  /**
+   * Consume a rawtext element's content verbatim, up to its EXACT closing
+   * tag (`</textarea>` — the strict subset requires the plain form). The
+   * content is inert text to the browser, so no tags, comments or holes are
+   * parsed inside it. A hole in the content can never track anything — the
+   * content is only the element's DEFAULT value — so the error names the
+   * cure (bind `value`) instead of describing the mechanism.
+   */
+  private scanRawText(el: OpenElement, s: string, i: number, p: number): number {
+    const close = `</${el.tag}>`;
+    const at = s.indexOf(close, i);
+    if (at === -1) {
+      if (p < this.strings.length - 1) {
+        this.fail(
+          el.tag === 'textarea'
+            ? 'a hole cannot go inside <textarea> — its content is only the DEFAULT value; bind value="${…}" instead'
+            : `a hole cannot go inside <${el.tag}> — rawtext content is static`,
+          p,
+          s.length,
+        );
+      }
+      this.fail(`unclosed <${el.tag}>`, el.origin.part, el.origin.offset);
+    }
+    this.html += s.slice(i, at) + close;
+    this.textOpen = false;
+    return at + close.length;
+  }
+
   private pushAttrHole(el: OpenElement, name: string, expr: number): void {
+    this.failIfInTemplate(expr);
     // event names are always lowercase — addEventListener('Click') is not a
     // click. Attribute names keep whatever casing scanTag decided on.
     const lower = name.toLowerCase();
