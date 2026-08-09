@@ -12,7 +12,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { ejectDir, RUNTIME_FILES } from '../src/eject.js';
+import { ejectDir, RUNTIME_FILES, ROUTER_FILES } from '../src/eject.js';
 
 const HERE = import.meta.url.startsWith('file:')
   ? dirname(fileURLToPath(import.meta.url))
@@ -25,6 +25,25 @@ async function write(rel: string, content: string): Promise<void> {
   const file = join(TMP, rel);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, content);
+}
+
+/** every emitted js under dir must be free of scoped-package imports */
+async function expectNoBareImports(dir: string): Promise<void> {
+  const files: string[] = [];
+  const walk = async (d: string): Promise<void> => {
+    for (const e of await readdir(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) await walk(p);
+      else files.push(p);
+    }
+  };
+  await walk(dir);
+  for (const f of files) {
+    if (!['.js', '.mjs'].includes(extname(f))) continue;
+    const src = await readFile(f, 'utf8');
+    expect(src).not.toMatch(/from\s+['"]@amojs\.dev\//);
+    expect(src).not.toMatch(/import\s*\(\s*['"]@amojs\.dev\//);
+  }
 }
 
 const APP = [
@@ -50,22 +69,11 @@ test('eject: output has zero amojs imports and RUNS without the package', async 
   expect(res.runtime).toContain(join('amo-runtime', 'index.js'));
   expect(res.runtime).toContain(join('amo-runtime', 'signal.js'));
 
-  // no emitted js anywhere IMPORTS from amojs (comments may mention it)
-  const files: string[] = [];
-  const walk = async (dir: string): Promise<void> => {
-    for (const e of await readdir(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) await walk(p);
-      else files.push(p);
-    }
-  };
-  await walk(join(TMP, 'dist'));
-  for (const f of files) {
-    if (!['.js', '.mjs'].includes(extname(f))) continue;
-    const src = await readFile(f, 'utf8');
-    expect(src).not.toMatch(/from\s+['"]amojs/);
-    expect(src).not.toMatch(/import\s*\(\s*['"]amojs/);
-  }
+  // no emitted js anywhere IMPORTS from amojs (comments may mention it).
+  // NOTE the pattern is the SCOPED name: the original /['"]amojs/ regex went
+  // silently vacuous in the 2026-08-06 scope rename — a gate that can never
+  // fail. Found 2026-08-09 while adding the router handover.
+  await expectNoBareImports(join(TMP, 'dist'));
 
   // specifiers point at the local runtime (parser-free entry for compiled code)
   const app = await readFile(join(TMP, 'dist/src/app.js'), 'utf8');
@@ -132,4 +140,56 @@ test('RUNTIME_FILES covers every file amojs ships (drift guard)', async () => {
   const coreSrc = join(HERE, '../../core/src');
   const shipped = (await readdir(coreSrc)).filter((f) => extname(f) === '.js');
   expect([...RUNTIME_FILES].sort()).toEqual(shipped.sort());
+});
+
+test('a project that routes gets the router handed over — and it RUNS', async () => {
+  await write(
+    'routerproj/src/app.js',
+    [
+      "import { signal, mount } from '@amojs.dev/core';",
+      "import { router, redirect } from '@amojs.dev/router';",
+      "export const r = redirect('/thanks');",
+      'export const s = signal(1);',
+      // never called here (no Navigation API off-browser) — importing the
+      // chain is what proves every specifier resolved relatively
+      "export const makeApp = () => router({ '/': () => import('./page.js') });",
+      'export { mount };',
+    ].join('\n'),
+  );
+  await write('routerproj/src/page.js', 'export default () => document.createTextNode("p");');
+
+  const res = await ejectDir(join(TMP, 'routerproj'), join(TMP, 'dist-router'));
+
+  // the router rode along with the runtime
+  expect(res.routerFrom).toBeDefined();
+  for (const f of ROUTER_FILES) {
+    expect(res.runtime).toContain(join('amo-runtime', 'router', f));
+  }
+
+  await expectNoBareImports(join(TMP, 'dist-router'));
+
+  // app imports point INTO the handed-over router; the router points at core
+  const app = await readFile(join(TMP, 'dist-router/src/app.js'), 'utf8');
+  expect(app).toContain("'../amo-runtime/router/index.js'");
+  const routerJs = await readFile(join(TMP, 'dist-router/amo-runtime/router/router.js'), 'utf8');
+  expect(routerJs).toContain("'../runtime.js'");
+  expect(routerJs).toContain("'../compiled.js'");
+
+  // and the chain executes with the packages gone from resolution entirely
+  const mod = await import(/* @vite-ignore */ join(TMP, 'dist-router/src/app.js'));
+  expect(mod.r).toEqual({ __redirect: '/thanks' });
+  expect(typeof mod.makeApp).toBe('function');
+});
+
+test('a project that does not route gets NO router directory', async () => {
+  await write('plainproj/src/app.js', "import { signal } from '@amojs.dev/core';\nexport const s = signal(1);");
+  const res = await ejectDir(join(TMP, 'plainproj'), join(TMP, 'dist-plain'));
+  expect(res.routerFrom).toBeUndefined();
+  expect(res.runtime.some((f) => f.includes('router'))).toBe(false);
+});
+
+test('ROUTER_FILES covers every file the router ships (drift guard)', async () => {
+  const routerSrc = join(HERE, '../../router/src');
+  const shipped = (await readdir(routerSrc)).filter((f) => extname(f) === '.js');
+  expect([...ROUTER_FILES].sort()).toEqual(shipped.sort());
 });

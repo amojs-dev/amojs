@@ -65,6 +65,12 @@ importers:
 
   packages/core: {}
 
+  packages/router:
+    devDependencies:
+      '@amojs.dev/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.1':

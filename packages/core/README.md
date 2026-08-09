@@ -13,9 +13,9 @@ is **1.98 KB**.
 
 > **Pre-1.0.** This is published so the name is claimed and tooling can depend
 > on a real version. The core is well tested and the size and correctness gates
-> below run in CI, but there is no router, no SSR, and no documentation site
-> yet. Read [Status](#status--what-is-not-here) before adopting it. The API may
-> still change.
+> below run in CI, but there is no SSR and no documentation site yet. Read
+> [Status](#status--what-is-not-here) before adopting it. The API may still
+> change.
 
 ---
 
@@ -149,9 +149,11 @@ parser: `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled`.
 
 Stated plainly, because finding out later is worse:
 
-- **No router.** Design is in progress; nothing ships today.
-- **No async-data primitive.** There is no `resource()`; a screen writes its
-  own loading signal.
+- **Routing is a separate package** —
+  [`@amojs.dev/router`](https://www.npmjs.com/package/@amojs.dev/router),
+  built on the Navigation API. Its `load()` also answers the async-data
+  question: pages receive *resolved* data, so there is no `resource()`
+  primitive in core and none is planned.
 - **No SSR.** Planned as static islands, never hydration.
 - **No documentation site yet.** [amojs.dev](https://amojs.dev) is currently a
   landing page.

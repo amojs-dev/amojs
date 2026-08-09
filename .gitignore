@@ -1,6 +1,7 @@
 node_modules/
 dist/
 packages/core/types/
+packages/router/types/
 .DS_Store
 *.log
 __tmp__/

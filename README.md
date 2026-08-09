@@ -28,7 +28,7 @@ mount(Counter, document.getElementById('app'));
 ```
 
 > **Pre-1.0.** Published so the name is claimed and tooling can depend on a real
-> version. There is no router, no SSR, and no documentation site yet — see
+> version. There is no SSR and no documentation site yet — see
 > [packages/core/README.md](packages/core/README.md#status--what-is-not-here)
 > for the full list of what is missing.
 
@@ -39,6 +39,7 @@ mount(Counter, document.getElementById('app'));
 | [`@amojs.dev/core`](packages/core) | the runtime — signals, `` html`` ``, `mount`. Plain JS, ships to browsers raw. Subpaths `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled` never load the template parser. | yes |
 | [`@amojs.dev/compiler`](packages/compiler) | parse → IR → codegen, plus `build`, `eject` and `diagnose`. TypeScript, runs on node only. | yes |
 | [`@amojs.dev/cli`](packages/cli) | the `amo` binary — `amo build`, `amo eject`. | yes |
+| [`@amojs.dev/router`](packages/router) | routing on the Navigation API — pages get *resolved* data, so no page ever renders a loading state. Parser-free; `amo eject` hands it over too. | yes |
 | `@amojs.dev/bench` | micro-benchmarks. Competitor libraries are quarantined here so the runtime keeps zero dependencies. | never |
 
 Editor support lives in a separate repository:

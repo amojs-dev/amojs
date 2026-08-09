@@ -1,26 +1,22 @@
 {
-  "name": "@amojs.dev/core",
-  "version": "0.7.1",
+  "name": "@amojs.dev/router",
+  "version": "0.7.0",
   "type": "module",
   "license": "MIT",
-  "description": "AmoJS reactive core — signals, html`` templates, mount. Zero dependencies; runs raw in the browser.",
+  "description": "AmoJS router — Navigation API routing where pages get resolved data. Zero dependencies; runs raw in the browser.",
   "keywords": [
-    "reactive",
-    "signals",
+    "router",
+    "navigation-api",
+    "spa",
     "fine-grained",
-    "ui",
-    "dom",
-    "template",
     "no-build",
-    "compiler",
-    "vanilla",
-    "framework"
+    "vanilla"
   ],
   "homepage": "https://amojs.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/amojs-dev/amojs.git",
-    "directory": "packages/core"
+    "directory": "packages/router"
   },
   "bugs": "https://github.com/amojs-dev/amojs/issues",
   "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
@@ -30,14 +26,6 @@
     ".": {
       "types": "./types/index.d.ts",
       "default": "./src/index.js"
-    },
-    "./runtime": {
-      "types": "./types/runtime.d.ts",
-      "default": "./src/runtime.js"
-    },
-    "./compiled": {
-      "types": "./types/compiled.d.ts",
-      "default": "./src/compiled.js"
     }
   },
   "files": [
@@ -46,6 +34,12 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "@amojs.dev/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@amojs.dev/core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"
