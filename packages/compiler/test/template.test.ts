@@ -7,7 +7,7 @@ import { parseTemplate } from '../src/template.js';
 test('text hole: <p>${x}</p>', () => {
   expect(parseTemplate(['<p>', '</p>'])).toEqual({
     html: '<p><!----></p>',
-    holes: [{ kind: 'child', expr: 0, path: [0, 0] }],
+    holes: [{ kind: 'child', expr: 0, path: [0, 0], htmlAt: 3 }],
     singleRootIndex: 0,
   });
 });
@@ -15,22 +15,22 @@ test('text hole: <p>${x}</p>', () => {
 test('static text before a hole becomes its own node: <p>c:${x}</p>', () => {
   expect(parseTemplate(['<p>c:', '</p>'])).toEqual({
     html: '<p>c:<!----></p>',
-    holes: [{ kind: 'child', expr: 0, path: [0, 1] }],
+    holes: [{ kind: 'child', expr: 0, path: [0, 1], htmlAt: 5 }],
     singleRootIndex: 0,
   });
 });
 
 test('adjacent holes get separate placeholder indexes: <p>${a}${b}</p>', () => {
   expect(parseTemplate(['<p>', '', '</p>']).holes).toEqual([
-    { kind: 'child', expr: 0, path: [0, 0] },
-    { kind: 'child', expr: 1, path: [0, 1] },
+    { kind: 'child', expr: 0, path: [0, 0], htmlAt: 3 },
+    { kind: 'child', expr: 1, path: [0, 1], htmlAt: 10 },
   ]);
 });
 
 test('unquoted attribute hole on a void element: <img src=${u} alt="x">', () => {
   expect(parseTemplate(['<img src=', ' alt="x">'])).toEqual({
     html: '<img alt="x">',
-    holes: [{ kind: 'attr', expr: 0, name: 'src', path: [0] }],
+    holes: [{ kind: 'attr', expr: 0, name: 'src', path: [0], htmlAt: 12, tag: 'img' }],
     singleRootIndex: 0,
   });
 });
@@ -38,7 +38,7 @@ test('unquoted attribute hole on a void element: <img src=${u} alt="x">', () => 
 test('quoted attribute hole: <div class="${c}">t</div>', () => {
   expect(parseTemplate(['<div class="', '">t</div>'])).toEqual({
     html: '<div>t</div>',
-    holes: [{ kind: 'attr', expr: 0, name: 'class', path: [0] }],
+    holes: [{ kind: 'attr', expr: 0, name: 'class', path: [0], htmlAt: 4, tag: 'div' }],
     singleRootIndex: 0,
   });
 });
@@ -46,34 +46,34 @@ test('quoted attribute hole: <div class="${c}">t</div>', () => {
 test('event hole: <button onclick=${f}>x</button>', () => {
   expect(parseTemplate(['<button onclick=', '>x</button>'])).toEqual({
     html: '<button>x</button>',
-    holes: [{ kind: 'event', expr: 0, name: 'click', path: [0] }],
+    holes: [{ kind: 'event', expr: 0, name: 'click', path: [0], htmlAt: 7 }],
     singleRootIndex: 0,
   });
 });
 
 test('nested element paths: <div><span>${x}</span><b>${y}</b></div>', () => {
   expect(parseTemplate(['<div><span>', '</span><b>', '</b></div>']).holes).toEqual([
-    { kind: 'child', expr: 0, path: [0, 0, 0] },
-    { kind: 'child', expr: 1, path: [0, 1, 0] },
+    { kind: 'child', expr: 0, path: [0, 0, 0], htmlAt: 11 },
+    { kind: 'child', expr: 1, path: [0, 1, 0], htmlAt: 28 },
   ]);
 });
 
 test('second root element: <i>a</i><i>${x}</i>', () => {
   expect(parseTemplate(['<i>a</i><i>', '</i>']).holes).toEqual([
-    { kind: 'child', expr: 0, path: [1, 0] },
+    { kind: 'child', expr: 0, path: [1, 0], htmlAt: 11 },
   ]);
 });
 
 test('void elements count as siblings: <div><br>${x}</div>', () => {
   const ir = parseTemplate(['<div><br>', '</div>']);
   expect(ir.html).toBe('<div><br><!----></div>');
-  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
+  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1], htmlAt: 9 }]);
 });
 
 test('comments count as siblings and pass through: <div><!--c-->${x}</div>', () => {
   const ir = parseTemplate(['<div><!--c-->', '</div>']);
   expect(ir.html).toBe('<div><!--c--><!----></div>');
-  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
+  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1], htmlAt: 13 }]);
 });
 
 test('boolean and unquoted static attributes pass through', () => {
@@ -98,7 +98,7 @@ test('a lone "<" is text, exactly like the browser: <p>a < b</p>', () => {
 test('whitespace around a hole stays in separate text nodes: <p> ${x} </p>', () => {
   const ir = parseTemplate(['<p> ', ' </p>']);
   expect(ir.html).toBe('<p> <!----> </p>');
-  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1] }]);
+  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1], htmlAt: 4 }]);
 });
 
 test('a template with no holes parses to plain IR', () => {
@@ -138,8 +138,8 @@ test('svg keeps name casing — SVG attributes are case-sensitive', () => {
 
 test('an svg attr hole keeps its casing, an svg event hole is lowercased', () => {
   expect(parseTemplate(['<svg><path pathLength=', ' onClick=', ' /></svg>']).holes).toEqual([
-    { kind: 'attr', expr: 0, name: 'pathLength', path: [0, 0] },
-    { kind: 'event', expr: 1, name: 'click', path: [0, 0] },
+    { kind: 'attr', expr: 0, name: 'pathLength', path: [0, 0], htmlAt: 10, tag: 'path' },
+    { kind: 'event', expr: 1, name: 'click', path: [0, 0], htmlAt: 10 },
   ]);
 });
 
@@ -169,8 +169,8 @@ test('inside svg, rawtext elements are ordinary — <title> is the a11y name', (
 test('holes and paths work inside svg', () => {
   const ir = parseTemplate(['<svg><circle r="', '"/><text>', '</text></svg>']);
   expect(ir.holes).toEqual([
-    { kind: 'attr', expr: 0, name: 'r', path: [0, 0] },
-    { kind: 'child', expr: 1, path: [0, 1, 0] },
+    { kind: 'attr', expr: 0, name: 'r', path: [0, 0], htmlAt: 12, tag: 'circle' },
+    { kind: 'child', expr: 1, path: [0, 1, 0], htmlAt: 20 },
   ]);
   expect(ir.html).toBe('<svg><circle/><text><!----></text></svg>');
 });
@@ -178,7 +178,7 @@ test('holes and paths work inside svg', () => {
 test('svg nested in html, with siblings after it, keeps sibling paths right', () => {
   const ir = parseTemplate(['<div><svg><use href="#a"/></svg><span>', '</span></div>']);
   expect(ir.html).toBe('<div><svg><use href="#a"/></svg><span><!----></span></div>');
-  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1, 0] }]);
+  expect(ir.holes).toEqual([{ kind: 'child', expr: 0, path: [0, 1, 0], htmlAt: 38 }]);
 });
 
 test('<math> is foreign content too', () => {
@@ -237,7 +237,7 @@ test('textarea with static content: content emitted verbatim, no children parsed
 test('textarea with a value attribute hole: the supported form', () => {
   expect(parseTemplate(['<textarea value="', '"></textarea>'])).toEqual({
     html: '<textarea></textarea>',
-    holes: [{ kind: 'attr', expr: 0, name: 'value', path: [0] }],
+    holes: [{ kind: 'attr', expr: 0, name: 'value', path: [0], htmlAt: 9, tag: 'textarea' }],
     singleRootIndex: 0,
   });
 });
@@ -252,7 +252,7 @@ test('script/style/title: static content is legal, emitted verbatim', () => {
 test('a sibling hole AFTER a rawtext element keeps a correct path', () => {
   expect(parseTemplate(['<div><textarea>x</textarea><p>', '</p></div>'])).toEqual({
     html: '<div><textarea>x</textarea><p><!----></p></div>',
-    holes: [{ kind: 'child', expr: 0, path: [0, 1, 0] }],
+    holes: [{ kind: 'child', expr: 0, path: [0, 1, 0], htmlAt: 30 }],
     singleRootIndex: 0,
   });
 });
@@ -273,7 +273,7 @@ test('throws: unclosed rawtext element', () => {
 
 test('svg <title> stays ordinary markup — holes inside are legal', () => {
   expect(parseTemplate(['<svg><title>', '</title></svg>']).holes).toEqual([
-    { kind: 'child', expr: 0, path: [0, 0, 0] },
+    { kind: 'child', expr: 0, path: [0, 0, 0], htmlAt: 12 },
   ]);
 });
 
@@ -307,7 +307,7 @@ test('throws: an attribute hole inside <template>', () => {
 test('static <template> content is legal; an attr hole ON <template> itself too', () => {
   expect(() => parseTemplate(['<template><p>x</p></template>'])).not.toThrow();
   expect(parseTemplate(['<template id="', '"><p>x</p></template>']).holes).toEqual([
-    { kind: 'attr', expr: 0, name: 'id', path: [0] },
+    { kind: 'attr', expr: 0, name: 'id', path: [0], htmlAt: 9, tag: 'template' },
   ]);
 });
 

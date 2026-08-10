@@ -13,7 +13,7 @@
 
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { buildDir, ejectDir } from '@amojs.dev/compiler';
+import { buildDir, ejectDir, ssgDir } from '@amojs.dev/compiler';
 
 const USAGE = `amo — compiles to the vanilla JS you would have written
 
@@ -23,6 +23,10 @@ Usage:
                                         build, then hand the runtime over and
                                         rewrite every "@amojs.dev/core" import to a
                                         relative path (default dir: amo-runtime)
+  amo ssg <src> <out> [--pages <dir>]   render every page module under
+                                        <src>/pages/ (or --pages) to static
+                                        .html — zero script bytes unless a page
+                                        carries its own island <script>
   amo --help | --version
 `;
 
@@ -50,6 +54,7 @@ async function requireDir(p: string, label: string): Promise<void> {
 async function main(argv: string[]): Promise<void> {
   const args: string[] = [];
   let runtimeDir: string | undefined;
+  let pagesDir: string | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -64,6 +69,9 @@ async function main(argv: string[]): Promise<void> {
     if (a === '--runtime') {
       runtimeDir = argv[++i];
       if (!runtimeDir) fail('amo: --runtime needs a value');
+    } else if (a === '--pages') {
+      pagesDir = argv[++i];
+      if (!pagesDir) fail('amo: --pages needs a value');
     } else if (a.startsWith('-')) {
       fail(`amo: unknown flag "${a}"\n\n${USAGE}`);
     } else {
@@ -72,11 +80,19 @@ async function main(argv: string[]): Promise<void> {
   }
 
   const [cmd, srcArg, outArg] = args;
-  if ((cmd !== 'build' && cmd !== 'eject') || !srcArg || !outArg || args.length > 3) {
+  if (
+    (cmd !== 'build' && cmd !== 'eject' && cmd !== 'ssg') ||
+    !srcArg ||
+    !outArg ||
+    args.length > 3
+  ) {
     fail(USAGE);
   }
-  if (cmd === 'build' && runtimeDir !== undefined) {
+  if (cmd !== 'eject' && runtimeDir !== undefined) {
     fail('amo: --runtime only applies to eject');
+  }
+  if (cmd !== 'ssg' && pagesDir !== undefined) {
+    fail('amo: --pages only applies to ssg');
   }
 
   const src = resolve(srcArg);
@@ -88,6 +104,12 @@ async function main(argv: string[]): Promise<void> {
     const r = await buildDir(src, out);
     process.stdout.write(
       `amo build — ${r.compiled.length} compiled, ${r.copied.length} copied → ${outArg}\n`,
+    );
+  } else if (cmd === 'ssg') {
+    const r = await ssgDir(src, out, pagesDir ? { pagesDir } : {});
+    process.stdout.write(
+      `amo ssg — ${r.pages.length} page${r.pages.length === 1 ? '' : 's'} rendered → ${outArg}\n` +
+        r.pages.map((p) => `  ${p.src} → ${p.out}\n`).join(''),
     );
   } else {
     const r = await ejectDir(src, out, runtimeDir ? { runtimeDir } : {});

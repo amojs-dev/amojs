@@ -9,6 +9,7 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative } from 'node:path';
 import { compileModule } from './codegen.js';
+import type { CompileOptions } from './codegen.js';
 
 export interface BuildResult {
   /** files that actually changed during compilation (repo-relative) */
@@ -20,7 +21,11 @@ export interface BuildResult {
 const JS_EXT = new Set(['.js', '.mjs']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
 
-export async function buildDir(srcDir: string, outDir: string): Promise<BuildResult> {
+export async function buildDir(
+  srcDir: string,
+  outDir: string,
+  opts: CompileOptions = {},
+): Promise<BuildResult> {
   const result: BuildResult = { compiled: [], copied: [] };
 
   async function walk(dir: string): Promise<void> {
@@ -36,7 +41,7 @@ export async function buildDir(srcDir: string, outDir: string): Promise<BuildRes
 
       if (JS_EXT.has(extname(entry.name))) {
         const source = await readFile(src, 'utf8');
-        const out = compileModule(source);
+        const out = compileModule(source, opts);
         await writeFile(dest, out);
         (out !== source ? result.compiled : result.copied).push(rel);
       } else {

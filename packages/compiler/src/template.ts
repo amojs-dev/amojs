@@ -73,6 +73,10 @@ interface OpenElement {
   foreign: boolean;
   /** the `<` of this tag */
   origin: Origin;
+  /** index into `holes` when this tag opened — every hole recorded past this
+   *  point belongs to this tag, and gets its `htmlAt` back-filled when the
+   *  open tag is finally emitted (only then is the offset known) */
+  holeStart: number;
 }
 
 /**
@@ -226,8 +230,9 @@ class Parser {
     // an empty comment marks the spot: it keeps adjacent static text nodes
     // apart through serialize→parse, so NodePaths stay valid. Consumers swap
     // it for an empty text node (see amojs/compiled tpl()).
+    const htmlAt = this.html.length;
     this.html += '<!---->';
-    this.holes.push({ kind: 'child', expr: p, path: [...f.path, f.count++] });
+    this.holes.push({ kind: 'child', expr: p, path: [...f.path, f.count++], htmlAt });
   }
 
   private scanText(s: string, i: number, p: number): number {
@@ -305,6 +310,7 @@ class Parser {
           attrs: '',
           foreign,
           origin: { part: p, offset: i }, // the `<`
+          holeStart: this.holes.length,
         };
         return i + m[0].length;
       }
@@ -334,6 +340,7 @@ class Parser {
       }
 
       if (ch === '>') {
+        this.sealTag(el);
         this.html += `<${el.emit}${el.attrs}>`;
         // a rawtext element owns everything to its closing tag — no child
         // parsing, no frame; its content is ONE inert text node either way
@@ -367,6 +374,7 @@ class Parser {
             i, // the offending "/"
           );
         }
+        this.sealTag(el);
         this.html += `<${el.emit}${el.attrs}${el.foreign ? '/' : ''}>`;
         this.el = null;
         return i + 2;
@@ -453,15 +461,30 @@ class Parser {
     return at + close.length;
   }
 
+  /**
+   * The open tag is about to be emitted, so the offset of its closing `>`
+   * (or the `/` of `/>`) is finally known — back-fill it into every hole this
+   * tag recorded. That offset is where the string backend splices serialized
+   * attributes in: right at the end of the open tag, which is also the order
+   * the DOM backend produces (bound attributes land after static ones).
+   */
+  private sealTag(el: OpenElement): void {
+    const htmlAt = this.html.length + 1 + el.emit.length + el.attrs.length;
+    for (let h = el.holeStart; h < this.holes.length; h++) {
+      this.holes[h].htmlAt = htmlAt;
+    }
+  }
+
   private pushAttrHole(el: OpenElement, name: string, expr: number): void {
     this.failIfInTemplate(expr);
     // event names are always lowercase — addEventListener('Click') is not a
     // click. Attribute names keep whatever casing scanTag decided on.
+    // htmlAt is a placeholder until sealTag() — the open tag is still growing.
     const lower = name.toLowerCase();
     if (lower.startsWith('on') && lower.length > 2) {
-      this.holes.push({ kind: 'event', expr, name: lower.slice(2), path: [...el.path] });
+      this.holes.push({ kind: 'event', expr, name: lower.slice(2), path: [...el.path], htmlAt: 0 });
     } else {
-      this.holes.push({ kind: 'attr', expr, name, path: [...el.path] });
+      this.holes.push({ kind: 'attr', expr, name, path: [...el.path], htmlAt: 0, tag: el.tag });
     }
   }
 }

@@ -3,7 +3,7 @@
 The `amo` binary for [AmoJS](https://github.com/amojs-dev/amojs) — a
 fine-grained UI compiler that produces the vanilla JS you would have written.
 
-Zero dependencies beyond AmoJS itself. It is two commands.
+Zero dependencies beyond AmoJS itself. It is three commands.
 
 > **Pre-1.0.** Flags and output layout may change.
 
@@ -27,6 +27,8 @@ amo eject <src> <out> [--runtime <dir>]
                                       build, then hand the runtime over and
                                       rewrite every "@amojs.dev/core" import to a
                                       relative path (default dir: amo-runtime)
+amo ssg <src> <out> [--pages <dir>]   render every page module under <src>/pages/
+                                      to static .html
 amo --help | --version
 ```
 
@@ -61,6 +63,38 @@ uninstall.
 **ejected project's own** installed `@amojs.dev/core` when there is one, so the output
 keeps the exact version the code was written against; the CLI prints where it
 came from.
+
+### `amo ssg`
+
+Static pages from the same components — **islands, never hydration**:
+
+```bash
+amo ssg src/ dist/
+```
+
+Every module under `src/pages/` is a page: its default export (sync or async)
+returns a template, which is rendered **on node** to `dist/<same path>.html`
+with `<!doctype html>` prepended. Signals evaluate once; text and attribute
+holes are escaped; no comment markers are emitted.
+
+```js
+// src/pages/index.js
+import { html } from '@amojs.dev/core';
+export default () => html`<html lang="en"><head><title>hi</title></head>
+<body><h1>${'hello'}</h1></body></html>`;
+```
+
+A page with no interactivity ships **zero** script bytes. An interactive
+island is nothing special — a static `<script type="module">` you write in
+the page that imports a normal AmoJS component (compiled by `amo build`) and
+`mount`s it into its container. Give that container intrinsic size: it is
+empty until the island mounts.
+
+Server-side notes, stated rather than hidden: render lists with `.map()`
+(`each()` is client-side keyed reconciliation); `ref` holes are skipped (no
+element exists to hand over); a `value` hole on `<textarea>` renders as its
+content; `value` on `<select>` is a build error — put `selected=${…}` on the
+matching `<option>` instead.
 
 ### TypeScript
 

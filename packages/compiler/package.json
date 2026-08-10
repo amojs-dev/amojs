@@ -1,16 +1,18 @@
 {
   "name": "@amojs.dev/compiler",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "type": "module",
   "license": "MIT",
-  "description": "AmoJS compiler — parse → IR → codegen. Runs on node only; never ships to browsers.",
+  "description": "AmoJS compiler — parse → IR → codegen (DOM and SSR string targets). Runs on node only; never ships to browsers.",
   "keywords": [
     "amojs",
     "compiler",
     "codegen",
     "signals",
     "template",
-    "eject"
+    "eject",
+    "ssr",
+    "ssg"
   ],
   "homepage": "https://amojs.dev",
   "repository": {

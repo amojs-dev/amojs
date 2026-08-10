@@ -30,6 +30,12 @@ export interface ChildHole {
   kind: 'child';
   expr: ExprIndex;
   path: NodePath;
+  /**
+   * Offset in `html` where this hole's `<!---->` marker starts. The string
+   * (SSR) backend splices its output here; the DOM backend never reads it.
+   * Recorded by the parser at emit time — a position, not a DOM concept.
+   */
+  htmlAt: number;
 }
 
 /** A hole as a full attribute value: `<img src=${x}>`. */
@@ -39,6 +45,12 @@ export interface AttrHole {
   path: NodePath;
   /** attribute name, lowercase */
   name: string;
+  /** offset in `html` of the `>` (or `/>`) closing this element's open tag —
+   *  where the string backend splices the serialized attribute in */
+  htmlAt: number;
+  /** the owning element's tag name, lowercase — the string backend needs it
+   *  (value/checked/selected serialize per element; the DOM asks `name in el`) */
+  tag: string;
 }
 
 /** An `on*` attribute hole: `<button onclick=${fn}>`. */
@@ -48,6 +60,10 @@ export interface EventHole {
   path: NodePath;
   /** event name without the `on` prefix, lowercase (e.g. "click") */
   name: string;
+  /** offset in `html` of the `>` closing this element's open tag — the string
+   *  backend still EVALUATES the expression there (a non-function must fail
+   *  identically in every mode), it just emits no markup */
+  htmlAt: number;
 }
 
 export type Hole = ChildHole | AttrHole | EventHole;

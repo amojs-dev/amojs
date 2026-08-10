@@ -12,6 +12,8 @@ export * from './ir.js';
 export * from './detect.js';
 export * from './template.js';
 export * from './codegen.js';
+export * from './codegen-ssr.js';
 export * from './build.js';
 export * from './eject.js';
 export * from './diagnose.js';
+export * from './ssg.js';

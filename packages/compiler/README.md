@@ -23,13 +23,21 @@ npm install --save-dev @amojs.dev/compiler
 ## API
 
 ```js
-import { compileModule, buildDir, ejectDir } from '@amojs.dev/compiler';
+import { compileModule, buildDir, ejectDir, ssgDir } from '@amojs.dev/compiler';
 
 // one module, source in → source out
 const compiled = compileModule(source);
 
+// the same templates as string concatenation — the SSR/SSG backend.
+// Same IR, second codegen: static HTML, escaped holes, no markers
+// (islands, never hydration — there is nothing to re-attach)
+const server = compileModule(source, { target: 'server' });
+
 // a whole project: compile amo modules, copy everything else verbatim
 await buildDir('src', 'dist');
+
+// render every page module under src/pages/ to static .html on node
+await ssgDir('src', 'dist');
 
 // build, then hand the runtime over and rewrite every "@amojs.dev/core" specifier
 // to a relative path, so the output has no bare imports left at all

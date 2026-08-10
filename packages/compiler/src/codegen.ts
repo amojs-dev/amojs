@@ -20,8 +20,21 @@ import { detectTemplates, walk } from './detect.js';
 import type { AnyNode } from './detect.js';
 import { parseTemplate } from './template.js';
 import type { TemplateIR } from './ir.js';
+import { generateServer, SSR_PREAMBLE } from './codegen-ssr.js';
 
-export function compileModule(source: string): string {
+export interface CompileOptions {
+  /**
+   * 'dom' (default) — the browser backend: hoisted templates + positional
+   * walks + one binding per hole.
+   * 'server' — the SSR/SSG backend: the same templates become string
+   * concatenation (static HTML, no markers — islands, never hydration).
+   * Server output runs on node; it is a build intermediate, not shipped code.
+   */
+  target?: 'dom' | 'server';
+}
+
+export function compileModule(source: string, opts: CompileOptions = {}): string {
+  const target = opts.target ?? 'dom';
   const templates = detectTemplates(source);
   if (templates.length === 0) return source;
 
@@ -66,16 +79,22 @@ export function compileModule(source: string): string {
   for (const { t, id } of ordered) {
     const ir = parseTemplate(t.strings);
     const exprs = t.expressions.map((e) => src.slice(map(e.start), map(e.end)));
-    const g = generate(ir, exprs, id);
-    hoisted[id] = g.hoisted;
-    usesChild ||= g.usesChild;
-    usesAttr ||= g.usesAttr;
-    usesEvent ||= g.usesEvent;
+    let expr: string;
+    if (target === 'server') {
+      expr = generateServer(ir, exprs, t.strings);
+    } else {
+      const g = generate(ir, exprs, id);
+      hoisted[id] = g.hoisted;
+      usesChild ||= g.usesChild;
+      usesAttr ||= g.usesAttr;
+      usesEvent ||= g.usesEvent;
+      expr = g.expr;
+    }
 
     const ms = map(t.start);
     const me = map(t.end);
-    src = src.slice(0, ms) + g.expr + src.slice(me);
-    edits.push({ origEnd: t.end, delta: g.expr.length - (me - ms) });
+    src = src.slice(0, ms) + expr + src.slice(me);
+    edits.push({ origEnd: t.end, delta: expr.length - (me - ms) });
   }
 
   // strip `html` from the core import when nothing references it anymore —
@@ -156,14 +175,24 @@ export function compileModule(source: string): string {
     edits.push({ origEnd: decl.source.end, delta: RUNTIME_SPEC.length - (me - ms) });
   }
 
-  const names = ['tpl as _$t'];
-  if (usesChild) names.push('bindChild as _$child');
-  if (usesAttr) names.push('bindAttr as _$attr');
-  if (usesEvent) names.push('bindEvent as _$event');
-  const header =
-    `\nimport { ${names.join(', ')} } from "@amojs.dev/core/compiled";\n` +
-    hoisted.join('\n') +
-    '\n';
+  let header: string;
+  if (target === 'server') {
+    // isSignal is the one runtime fact the string backend needs, and core
+    // runs on node by design (LOCKED RULE #5 — no DOM at module top level)
+    header =
+      `\nimport { isSignal as _$is } from "@amojs.dev/core/runtime";\n` +
+      SSR_PREAMBLE +
+      '\n';
+  } else {
+    const names = ['tpl as _$t'];
+    if (usesChild) names.push('bindChild as _$child');
+    if (usesAttr) names.push('bindAttr as _$attr');
+    if (usesEvent) names.push('bindEvent as _$event');
+    header =
+      `\nimport { ${names.join(', ')} } from "@amojs.dev/core/compiled";\n` +
+      hoisted.join('\n') +
+      '\n';
+  }
 
   const at = map(importEnd);
   return src.slice(0, at) + header + src.slice(at);

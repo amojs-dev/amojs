@@ -90,6 +90,27 @@ test('amo eject --runtime: custom runtime directory name', async () => {
   expect(app).toContain('../vendor/');
 });
 
+test('amo ssg: renders pages to static html through the real binary', async () => {
+  await write(
+    'proj4/pages/index.js',
+    [
+      "import { html, signal } from '@amojs.dev/core';",
+      'const n = signal(2);',
+      'export default () => html`<html lang="en"><head><title>t</title></head><body><p>n:${n}</p></body></html>`;',
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'ssg', join(TMP, 'proj4'), join(TMP, 'dist-ssg'),
+  ]);
+  expect(stdout).toContain('amo ssg — 1 page rendered');
+
+  const page = await readFile(join(TMP, 'dist-ssg/index.html'), 'utf8');
+  expect(page.startsWith('<!doctype html>\n<html lang="en">')).toBe(true);
+  expect(page).toContain('<p>n:2</p>');
+  expect(page).not.toContain('<script'); // no islands written → zero script bytes
+});
+
 test('amo without a valid command exits 1 and prints usage to stderr', async () => {
   const err = await run(process.execPath, [AMO]).then(
     () => null,
