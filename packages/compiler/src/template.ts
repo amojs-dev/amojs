@@ -128,6 +128,8 @@ class Parser {
   private el: OpenElement | null = null;
   /** set when a part ended in an attribute-value hole; consumed at next part */
   private resume: { quote: string | null } | null = null;
+  /** non-null while inside <title> content that a hole interrupted */
+  private rawText: OpenElement | null = null;
   /** root-level bookkeeping for the static unwrap decision */
   private rootElements = 0;
   private rootElementIndex = -1;
@@ -195,12 +197,21 @@ class Parser {
       }
 
       while (i < s.length) {
-        i = this.el ? this.scanTag(s, i, p) : this.scanText(s, i, p);
+        i = this.rawText
+          ? this.scanRawText(this.rawText, s, i, p)
+          : this.el
+            ? this.scanTag(s, i, p)
+            : this.scanText(s, i, p);
       }
 
       if (p < this.strings.length - 1) this.boundary(p);
     }
 
+    if (this.rawText) {
+      // rawtext pushes no frame, so the stack check below cannot catch this
+      const { tag, origin } = this.rawText;
+      this.fail(`unclosed <${tag}>`, origin.part, origin.offset);
+    }
     if (this.el) {
       const { tag, origin } = this.el;
       this.fail(`template ends inside <${tag}>`, origin.part, origin.offset);
@@ -217,6 +228,13 @@ class Parser {
   /** A part boundary is a hole. Legal only in text position or as a full attr value. */
   private boundary(p: number): void {
     if (this.resume) return; // attribute-value hole — already recorded by scanTag
+    if (this.rawText) {
+      // inside <title> content: escaped text at an offset, server target only
+      this.failIfInTemplate(p);
+      const { tag, path } = this.rawText;
+      this.holes.push({ kind: 'content', expr: p, path: [...path], htmlAt: this.html.length, tag });
+      return;
+    }
     if (this.el) {
       this.fail(
         'a hole may only be an element child or a full attribute value',
@@ -440,12 +458,21 @@ class Parser {
    * parsed inside it. A hole in the content can never track anything — the
    * content is only the element's DEFAULT value — so the error names the
    * cure (bind `value`) instead of describing the mechanism.
+   *
+   * `<title>` is the exception: it has no property to bind and a server-rendered
+   * page needs its title in the markup, so a hole there is recorded as a
+   * ContentHole and resumed on the next part. See ir.ts.
    */
   private scanRawText(el: OpenElement, s: string, i: number, p: number): number {
     const close = `</${el.tag}>`;
     const at = s.indexOf(close, i);
     if (at === -1) {
       if (p < this.strings.length - 1) {
+        if (el.tag === 'title') {
+          this.html += s.slice(i); // boundary() records the hole at this offset
+          this.rawText = el;
+          return s.length;
+        }
         this.fail(
           el.tag === 'textarea'
             ? 'a hole cannot go inside <textarea> — its content is only the DEFAULT value; bind value="${…}" instead'
@@ -457,6 +484,7 @@ class Parser {
       this.fail(`unclosed <${el.tag}>`, el.origin.part, el.origin.offset);
     }
     this.html += s.slice(i, at) + close;
+    this.rawText = null;
     this.textOpen = false;
     return at + close.length;
   }

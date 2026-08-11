@@ -3,7 +3,9 @@
  * amo — the AmoJS CLI (v0.4b).
  *
  * A thin, zero-dependency wrapper over @amojs.dev/compiler:
- *   amo build <src> <out>   → buildDir  (compile amo modules, copy the rest)
+ *   amo build <src> <out>   → buildDir  (compile amo modules, copy the rest;
+ *                                        --target server emits strings for node)
+ *   amo ssg   <src> <out>   → ssgDir    (render pages/ to static .html now)
  *   amo eject <src> <out>   → ejectDir  (build + hand over the runtime,
  *                                        rewrite imports to relative paths)
  *
@@ -18,7 +20,11 @@ import { buildDir, ejectDir, ssgDir } from '@amojs.dev/compiler';
 const USAGE = `amo — compiles to the vanilla JS you would have written
 
 Usage:
-  amo build <src> <out>                 compile amo modules, copy everything else
+  amo build <src> <out> [--target dom|server]
+                                        compile amo modules, copy everything
+                                        else. --target server emits string
+                                        concatenation instead of DOM calls, for
+                                        rendering on node (default: dom)
   amo eject <src> <out> [--runtime <dir>]
                                         build, then hand the runtime over and
                                         rewrite every "@amojs.dev/core" import to a
@@ -55,6 +61,7 @@ async function main(argv: string[]): Promise<void> {
   const args: string[] = [];
   let runtimeDir: string | undefined;
   let pagesDir: string | undefined;
+  let target: 'dom' | 'server' | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -72,6 +79,10 @@ async function main(argv: string[]): Promise<void> {
     } else if (a === '--pages') {
       pagesDir = argv[++i];
       if (!pagesDir) fail('amo: --pages needs a value');
+    } else if (a === '--target') {
+      const t = argv[++i];
+      if (t !== 'dom' && t !== 'server') fail('amo: --target must be "dom" or "server"');
+      target = t;
     } else if (a.startsWith('-')) {
       fail(`amo: unknown flag "${a}"\n\n${USAGE}`);
     } else {
@@ -94,6 +105,10 @@ async function main(argv: string[]): Promise<void> {
   if (cmd !== 'ssg' && pagesDir !== undefined) {
     fail('amo: --pages only applies to ssg');
   }
+  // eject hands over a browser runtime, and ssg picks its own target per step
+  if (cmd !== 'build' && target !== undefined) {
+    fail('amo: --target only applies to build');
+  }
 
   const src = resolve(srcArg);
   const out = resolve(outArg);
@@ -101,9 +116,14 @@ async function main(argv: string[]): Promise<void> {
   if (out === src) fail('amo: <out> must differ from <src>');
 
   if (cmd === 'build') {
-    const r = await buildDir(src, out);
+    const r = await buildDir(src, out, target ? { target } : {});
     process.stdout.write(
-      `amo build — ${r.compiled.length} compiled, ${r.copied.length} copied → ${outArg}\n`,
+      `amo build${target === 'server' ? ' (server target)' : ''} — ` +
+        `${r.compiled.length} compiled, ${r.copied.length} copied → ${outArg}\n` +
+        (target === 'server'
+          ? 'these modules render to strings on node — import a page and call it ' +
+            'with that request\'s props.\n'
+          : ''),
     );
   } else if (cmd === 'ssg') {
     const r = await ssgDir(src, out, pagesDir ? { pagesDir } : {});

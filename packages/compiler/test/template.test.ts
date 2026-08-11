@@ -271,6 +271,23 @@ test('throws: unclosed rawtext element', () => {
   expect(() => parseTemplate(['<textarea>abc'])).toThrow(/unclosed <textarea>/);
 });
 
+test('<title> content takes holes — recorded as content holes at one offset', () => {
+  const ir = parseTemplate(['<title>', ' | ', '</title>']);
+  expect(ir.html).toBe('<title> | </title>');
+  expect(ir.holes).toEqual([
+    { kind: 'content', expr: 0, path: [0], htmlAt: 7, tag: 'title' },
+    { kind: 'content', expr: 1, path: [0], htmlAt: 10, tag: 'title' },
+  ]);
+
+  // adjacent holes share an offset; the closing tag is still required
+  expect(parseTemplate(['<title>', '', '</title>']).holes).toHaveLength(2);
+  expect(() => parseTemplate(['<title>', ''])).toThrow(/unclosed <title>/);
+  // and it stays illegal where NO hole can bind
+  expect(() => parseTemplate(['<template><title>', '</title></template>'])).toThrow(
+    /inside <template>/,
+  );
+});
+
 test('svg <title> stays ordinary markup — holes inside are legal', () => {
   expect(parseTemplate(['<svg><title>', '</title></svg>']).holes).toEqual([
     { kind: 'child', expr: 0, path: [0, 0, 0], htmlAt: 12 },

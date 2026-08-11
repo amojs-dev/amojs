@@ -146,6 +146,12 @@ test('rawtext: a hole inside <textarea> content throws', () => {
   expect(() => html`<textarea>${x}</textarea>`).toThrow(/unsupported spot/);
 });
 
+test('rawtext: a hole inside <title> throws in the browser — set document.title', () => {
+  // the compiler ACCEPTS this one for its server target (a page needs its title
+  // in the markup). On the client the existing guard is the whole cost.
+  expect(() => html`<title>${signal('a')}</title>`).toThrow(/unsupported spot/);
+});
+
 test('a hole inside <template> throws instead of silently vanishing', () => {
   const x = signal('a');
   expect(() => html`<template><p>${x}</p></template>`).toThrow(/unsupported spot/);

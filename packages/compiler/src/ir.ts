@@ -66,7 +66,27 @@ export interface EventHole {
   htmlAt: number;
 }
 
-export type Hole = ChildHole | AttrHole | EventHole;
+/**
+ * Text inside a rawtext element's content: `<title>${name}</title>`.
+ *
+ * `<title>` only, SERVER target only. The client answer is `document.title = …`
+ * (binding it would mean walking into rawtext, which neither walker enters);
+ * a server has no escape, since a page title must be in the HTML. So the two
+ * backends differ in what they ACCEPT here — the mirror of the server-only
+ * errors on `<select value>` and `indeterminate`.
+ */
+export interface ContentHole {
+  kind: 'content';
+  expr: ExprIndex;
+  path: NodePath;
+  /** offset in `html` to insert at — no marker (a comment inside rawtext is
+   *  literal text). Holes may share an offset: `<title>${a}${b}</title>`. */
+  htmlAt: number;
+  /** the owning element's tag name, lowercase */
+  tag: string;
+}
+
+export type Hole = ChildHole | AttrHole | EventHole | ContentHole;
 
 /** The IR of one `html\`…\`` template. */
 export interface TemplateIR {

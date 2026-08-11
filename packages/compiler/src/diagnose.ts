@@ -11,6 +11,11 @@
  * It answers one question — "what is wrong with this file, and where" — with no
  * DOM, no filesystem and no editor API involved. A consumer converts the offsets
  * into whatever range type it uses.
+ *
+ * It reports only TARGET-INDEPENDENT errors. A dynamic `<title>` is valid for
+ * the server target and rejected by the DOM one, and nothing in a file says
+ * which target it is built with — squiggling a correct SSR page would be worse
+ * than staying quiet, so the build reports that one.
  */
 
 import { detectTemplates } from './detect.js';

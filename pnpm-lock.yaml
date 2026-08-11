@@ -71,6 +71,16 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/vite:
+    dependencies:
+      '@amojs.dev/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+    devDependencies:
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.1':

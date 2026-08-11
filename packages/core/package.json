@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/core",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS reactive core — signals, html`` templates, mount. Zero dependencies; runs raw in the browser.",
@@ -38,14 +38,23 @@
     "./compiled": {
       "types": "./types/compiled.d.ts",
       "default": "./src/compiled.js"
+    },
+    "./browser": {
+      "types": "./types/index.d.ts",
+      "default": "./dist/browser.js"
+    },
+    "./browser/runtime": {
+      "types": "./types/runtime.d.ts",
+      "default": "./dist/browser-runtime.js"
     }
   },
   "files": [
     "src",
-    "types"
+    "types",
+    "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "node scripts/bundle.mjs && tsc -p tsconfig.build.json"
   },
   "publishConfig": {
     "access": "public"

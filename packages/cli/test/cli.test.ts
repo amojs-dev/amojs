@@ -12,7 +12,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
 const run = promisify(execFile);
@@ -109,6 +109,50 @@ test('amo ssg: renders pages to static html through the real binary', async () =
   expect(page.startsWith('<!doctype html>\n<html lang="en">')).toBe(true);
   expect(page).toContain('<p>n:2</p>');
   expect(page).not.toContain('<script'); // no islands written → zero script bytes
+});
+
+test('amo build --target server: request-time SSR through the real binary', async () => {
+  // one page, one prop — the whole point is that the SAME module renders
+  // different HTML per call, which is what a request handler needs
+  await write(
+    'proj5/pages/product.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default ({ name }) => html`<h1>${name}</h1>`;',
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', join(TMP, 'proj5'), join(TMP, 'dist-server'), '--target', 'server',
+  ]);
+  expect(stdout).toContain('amo build (server target) — 1 compiled');
+
+  const out = join(TMP, 'dist-server/pages/product.js');
+  const code = await readFile(out, 'utf8');
+  expect(code).not.toContain('_$t('); // no DOM backend
+  expect(code).toContain('_$c(name)'); // string concatenation instead
+
+  // import it and render twice, the way an http handler does
+  const mod = (await import(pathToFileURL(out).href)) as {
+    default: (p: { name: string }) => { __amoHtml: string };
+  };
+  expect(String(mod.default({ name: 'Laptop' }))).toBe('<h1>Laptop</h1>');
+  expect(String(mod.default({ name: '<script>' }))).toBe('<h1>&lt;script></h1>');
+  // the field stays available for code that wants to check the shape
+  expect(mod.default({ name: 'x' }).__amoHtml).toBe('<h1>x</h1>');
+});
+
+test('amo: --target is rejected on the commands it cannot mean anything for', async () => {
+  for (const cmd of ['ssg', 'eject']) {
+    const err = await run(process.execPath, [
+      AMO, cmd, join(TMP, 'proj5'), join(TMP, 'dist-nope'), '--target', 'server',
+    ]).then(() => null, (e: Error & { stderr?: string }) => e);
+    expect(err?.stderr).toContain('--target only applies to build');
+  }
+  const bad = await run(process.execPath, [
+    AMO, 'build', join(TMP, 'proj5'), join(TMP, 'dist-nope'), '--target', 'node',
+  ]).then(() => null, (e: Error & { stderr?: string }) => e);
+  expect(bad?.stderr).toContain('--target must be "dom" or "server"');
 });
 
 test('amo without a valid command exits 1 and prints usage to stderr', async () => {

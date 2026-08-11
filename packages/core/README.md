@@ -13,7 +13,7 @@ is **1.98 KB**.
 
 > **Pre-1.0.** This is published so the name is claimed and tooling can depend
 > on a real version. The core is well tested and the size and correctness gates
-> below run in CI, but there is no SSR and no documentation site yet. Read
+> below run in CI, but there is no documentation site yet. Read
 > [Status](#status--what-is-not-here) before adopting it. The API may still
 > change.
 
@@ -145,6 +145,35 @@ keeps working.
 Subpath entries for compiled and ejected output, which never load the template
 parser: `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled`.
 
+## One request instead of seven
+
+Raw ESM has no bundler, so an import chain *is* the network cost: loading the
+source files directly costs seven requests, three levels deep. The package
+therefore also ships prebuilt single-file twins — no build step, no bundler,
+just a different url in the importmap:
+
+| file | replaces | min+gz |
+|---|---|---|
+| `dist/browser.js` | `@amojs.dev/core` (parser included) | 3.3 KB |
+| `dist/browser-runtime.js` | `@amojs.dev/core/runtime` **and** `/compiled` | 2.5 KB |
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "@amojs.dev/core/runtime": "/node_modules/@amojs.dev/core/dist/browser-runtime.js",
+      "@amojs.dev/core/compiled": "/node_modules/@amojs.dev/core/dist/browser-runtime.js"
+    }
+  }
+</script>
+```
+
+Pointing both specifiers at the **same** url is required, not cosmetic: core
+keeps module-level state, so two copies on one page do not interoperate. A
+compiled app must use `browser-runtime.js` — CI asserts it does not contain the
+parser. `src/` remains the source of truth: it is what `amo eject` hands over
+and what you read when you want to know what the code does.
+
 ## Status — what is not here
 
 Stated plainly, because finding out later is worse:
@@ -154,7 +183,11 @@ Stated plainly, because finding out later is worse:
   built on the Navigation API. Its `load()` also answers the async-data
   question: pages receive *resolved* data, so there is no `resource()`
   primitive in core and none is planned.
-- **No SSR.** Planned as static islands, never hydration.
+- **Server rendering lives in the compiler, not here.**
+  [`@amojs.dev/cli`](https://www.npmjs.com/package/@amojs.dev/cli)'s `amo ssg`
+  renders pages to static HTML at build time from the same templates — static
+  islands, never hydration, so a page with no island ships zero script bytes.
+  Nothing in this package runs on the server.
 - **No documentation site yet.** [amojs.dev](https://amojs.dev) is currently a
   landing page.
 - **No deep reactivity, deliberately.** There is no Proxy layer. Replace the
@@ -162,9 +195,10 @@ Stated plainly, because finding out later is worse:
   Magic mutation cannot be ejected as "code you would have written", which is
   the whole promise.
 - **The template language is a strict subset of HTML.** Closing tags must be
-  explicit, raw-text elements (`<textarea>`, `<script>`, `<style>`) are
-  rejected inside templates, and an attribute hole must be the entire attribute
-  value — `class="${x}"`, not `class="a ${x}"`.
+  explicit; raw-text elements (`<textarea>`, `<script>`, `<style>`, `<title>`)
+  carry static content only, so a `<textarea>` binds through
+  `value="${x}"` rather than through its children; and an attribute hole must
+  be the entire attribute value — `class="${x}"`, not `class="a ${x}"`.
 - **No global event delegation.** Listeners are attached per element, exactly
   as in vanilla.
 

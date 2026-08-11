@@ -7,6 +7,14 @@
  * no serialized state — interactive islands rebuild their own DOM on the
  * client, so the string needs to carry nothing but markup.
  *
+ * THE RETURN VALUE IS THE PUBLIC CONTRACT of the server target. A template
+ * evaluates to `{ __amoHtml, toString() }`, so a request handler needs nothing
+ * of ours at runtime — `'<!doctype html>\n' + await page(props)` is the whole
+ * of request-time SSR, and a production server installs no AmoJS package. The
+ * field stays for code that wants to check the shape (ssgDir does); `toString`
+ * is what a human writes. Serving the CLIENT build by mistake cannot pass
+ * silently: DOM-target code calls `document.createElement` and node throws.
+ *
  * Escaping (the whole of it — deliberately small and in ONE place):
  *   text position       & <        (what Svelte escapes)
  *   attribute position  & " <      (the `<` matters: Solid skips it and
@@ -27,6 +35,8 @@
  * the way every string renderer ends up doing:
  *   value    input/option/button/progress/meter/… → a value attribute
  *            textarea → the element's CONTENT (replacing the static default)
+ *   (a ContentHole — `<title>${x}</title>` — is escaped text at an offset, and
+ *    is the one hole the DOM backend rejects instead: see ir.ts)
  *            select   → compile error (put selected=${…} on the option)
  *   checked  input  → bare attribute when truthy, nothing when falsy
  *   selected option → same
@@ -44,7 +54,7 @@ const _$ea = (s) =>
   s.replace(/[&"<]/g, (c) => (c === '&' ? '&amp;' : c === '"' ? '&quot;' : '&lt;'));
 const _$txt = (v) => (v == null || v === false ? '' : String(v));
 const _$u = (v) => (_$is(v) ? v.value : typeof v === 'function' ? v() : v);
-const _$h = (h) => ({ __amoHtml: h });
+const _$h = (h) => ({ __amoHtml: h, toString: () => h });
 const _$c = (v) => {
   v = _$u(v);
   if (v && typeof v.__amoHtml === 'string') return v.__amoHtml;
@@ -111,6 +121,9 @@ export function generateServer(
     const e = exprs[h.expr];
     if (h.kind === 'child') {
       splices.push({ at: h.htmlAt - base, len: MARKER.length, code: `_$c(${e})` });
+    } else if (h.kind === 'content') {
+      // rawtext content: escaped text at an insertion point (<title> only)
+      splices.push({ at: h.htmlAt - base, len: 0, code: `_$ta(${e})` });
     } else if (h.kind === 'event') {
       splices.push({ at: h.htmlAt - base, len: 0, code: `_$e(${JSON.stringify(h.name)}, ${e})` });
     } else if (h.name === 'ref') {

@@ -15,9 +15,12 @@
  *      by `amo build`.
  *
  * A page module:
- *   export default () => html`<html><head>…</head><body>…</body></html>`
+ *   export default (props) => html`<html><head>…</head><body>…</body></html>`
  * `load`-style data fetching is the default export's own business — it may
- * be async; the render waits.
+ * be async; the render waits. ssg has no request, so it passes `{}`; the same
+ * module rendered per request receives that request's props instead — see
+ * `buildDir(src, out, { target: 'server' })`, which is `amo build --target
+ * server` on the command line.
  */
 
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
@@ -73,7 +76,10 @@ export async function ssgDir(
           `amo ssg: ${join(pagesDir, rel)} needs a default export (a component returning a template)`,
         );
       }
-      const res = (await mod.default()) as { __amoHtml?: unknown } | null;
+      // ONE calling convention for both consumers: a page is `(props) => …`.
+      // A build has no request, so ssg passes an empty object — never nothing,
+      // or every page that destructures its props would throw here.
+      const res = (await mod.default({})) as { __amoHtml?: unknown } | null;
       if (!res || typeof res.__amoHtml !== 'string') {
         throw new Error(
           `amo ssg: ${join(pagesDir, rel)} did not return a template — a page returns html\`…\``,

@@ -68,6 +68,13 @@ test('static rawtext content is legal; a hole inside it underlines the hole', ()
   expect(out[0].text).toBe('${x}'); // the hole, per the part-end convention
 });
 
+test('a dynamic <title> is NOT reported — legality depends on the build target', () => {
+  // valid for the server target; the DOM target rejects it at build time. The
+  // file does not say which target it is built with, so the editor stays quiet
+  // rather than squiggle a correct SSR page.
+  expect(marked(`${IMPORT}const el = html\`<title>\${x}</title>\`;`)).toEqual([]);
+});
+
 test('a partial attribute value underlines where the value continues', () => {
   const out = marked(`${IMPORT}const el = html\`<div class="a\${x}">t</div>\`;`);
   expect(out[0].message).toMatch(/entire quoted value/);

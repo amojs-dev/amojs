@@ -1,16 +1,15 @@
 {
-  "name": "@amojs.dev/compiler",
-  "version": "0.9.1",
+  "name": "@amojs.dev/vite",
+  "version": "0.9.0",
   "type": "module",
   "license": "MIT",
-  "description": "AmoJS compiler — parse → IR → codegen (DOM and SSR string targets). Runs on node only; never ships to browsers.",
+  "description": "Vite plugin for AmoJS — compiles html`` templates during a normal Vite build, so bundling, tree-shaking and code-splitting are Vite's job.",
   "keywords": [
     "amojs",
+    "vite",
+    "vite-plugin",
     "compiler",
-    "codegen",
     "signals",
-    "template",
-    "eject",
     "ssr",
     "ssg"
   ],
@@ -18,7 +17,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/amojs-dev/amojs.git",
-    "directory": "packages/compiler"
+    "directory": "packages/vite"
   },
   "bugs": "https://github.com/amojs-dev/amojs/issues",
   "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
@@ -26,10 +25,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./diagnose": {
-      "types": "./dist/diagnose.d.ts",
-      "default": "./dist/diagnose.js"
     }
   },
   "engines": {
@@ -42,8 +37,13 @@
     "dist"
   ],
   "dependencies": {
-    "@amojs.dev/core": "workspace:*",
-    "acorn": "^8.18.0"
+    "@amojs.dev/compiler": "workspace:*"
+  },
+  "peerDependencies": {
+    "vite": ">=5"
+  },
+  "devDependencies": {
+    "vite": "^8.2.0"
   },
   "publishConfig": {
     "access": "public"

@@ -18,7 +18,7 @@
 import { parse } from 'acorn';
 import { detectTemplates, walk } from './detect.js';
 import type { AnyNode } from './detect.js';
-import { parseTemplate } from './template.js';
+import { parseTemplate, TemplateError } from './template.js';
 import type { TemplateIR } from './ir.js';
 import { generateServer, SSR_PREAMBLE } from './codegen-ssr.js';
 
@@ -83,6 +83,14 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
     if (target === 'server') {
       expr = generateServer(ir, exprs, t.strings);
     } else {
+      const content = ir.holes.find((h) => h.kind === 'content');
+      if (content) {
+        throw new TemplateError(
+          `a hole inside <${content.tag}> renders on the server only — on the client set document.title`,
+          content.expr,
+          t.strings[content.expr].length,
+        );
+      }
       const g = generate(ir, exprs, id);
       hoisted[id] = g.hoisted;
       usesChild ||= g.usesChild;

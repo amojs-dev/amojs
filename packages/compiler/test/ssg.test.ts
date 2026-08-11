@@ -11,7 +11,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { compileModule } from '../src/codegen.js';
 import { ssgDir } from '../src/ssg.js';
-import { TMP, cleanupFixtures } from './harness.js';
+import { TMP, cleanupFixtures, load } from './harness.js';
 
 afterAll(cleanupFixtures);
 
@@ -52,6 +52,31 @@ test('server target rejects indeterminate on <input> and names the cure', () => 
     /set it from an island after mount/,
   );
   expect(() => compileModule(src)).not.toThrow();
+});
+
+test('a dynamic <title> renders on the server and is rejected by the DOM target', () => {
+  const src =
+    "import { html } from '@amojs.dev/core';\n" +
+    'export default ({ n }) => html`<title>${n} — Shop</title>`;';
+
+  const out = compileModule(src, { target: 'server' });
+  expect(out).toContain('<title>'); // static text around the hole survives
+  expect(out).toContain(' — Shop</title>');
+  expect(out).toContain('_$ta(n)'); // escaped as text, not as an attribute
+
+  // the mirror of the two cases above: here the SERVER accepts and the DOM does not
+  expect(() => compileModule(src)).toThrow(/on the client set document\.title/);
+});
+
+test('a dynamic <title> escapes, and two holes in one title keep source order', async () => {
+  const { t } = await load(
+    compileModule(
+      "import { html } from '@amojs.dev/core';\n" +
+        'export const t = ({ a, b }) => html`<title>${a} | ${b}</title>`;',
+      { target: 'server' },
+    ),
+  );
+  expect(String(t({ a: '<Shop>', b: 'A & B' }))).toBe('<title>&lt;Shop> | A &amp; B</title>');
 });
 
 /* ---------------- ssgDir: pages → static html ---------------- */
@@ -122,6 +147,20 @@ test('ssgDir renders pages to .html — doctype, data, islands script, structure
   // the server-compile temp dir is gone
   const leftovers = (await readdir(out)).filter((f) => f.startsWith('.amo-ssg'));
   expect(leftovers).toEqual([]);
+});
+
+test('ssgDir: a page that destructures its props renders — ssg passes {}', async () => {
+  // ONE calling convention with request-time SSR, where props are real. A page
+  // written for both must not explode at build time for lack of an argument.
+  const src = await writeProject({
+    'pages/index.js': [
+      "import { html } from '@amojs.dev/core';",
+      "export default ({ title = 'default' }) => html`<h1>${title}</h1>`;",
+    ].join('\n'),
+  });
+  const out = join(src, 'out');
+  await ssgDir(src, out);
+  expect(await readFile(join(out, 'index.html'), 'utf8')).toContain('<h1>default</h1>');
 });
 
 test('ssgDir: a page without a default export fails loudly, naming the file', async () => {
