@@ -87,7 +87,7 @@ test('amo build ssr: server target plus an automatic islands pass', async () => 
     [
       "import { signal, html, mount } from '@amojs.dev/core';",
       'const n = signal(0);',
-      "mount(document.body, () => html`<button onclick=${() => n.value++}>${n}</button>`);",
+      "mount(() => html`<button onclick=${() => n.value++}>${n}</button>`, document.body);",
     ].join('\n'),
   );
 
@@ -144,7 +144,7 @@ test('amo build ssg: renders pages to static html, islands pass included', async
     [
       "import { signal, html, mount } from '@amojs.dev/core';",
       'const n = signal(0);',
-      "mount(document.body, () => html`<button onclick=${() => n.value++}>${n}</button>`);",
+      "mount(() => html`<button onclick=${() => n.value++}>${n}</button>`, document.body);",
     ].join('\n'),
   );
   await write('proj-ssg/src/styles/site.css', 'p { color: teal }');
