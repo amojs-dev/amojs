@@ -40,9 +40,13 @@ function fail(msg: string): never {
   process.exit(1);
 }
 
+/** `.git` never counts — scaffolding into a freshly-initialized repo is the
+    most common flow there is */
+const IGNORED_ENTRIES = new Set(['.git', '.DS_Store']);
+
 async function isEmptyOrMissing(dir: string): Promise<boolean> {
   try {
-    return (await readdir(dir)).filter((f) => f !== '.DS_Store').length === 0;
+    return (await readdir(dir)).filter((f) => !IGNORED_ENTRIES.has(f)).length === 0;
   } catch {
     return true; // missing — mkdir will create it
   }

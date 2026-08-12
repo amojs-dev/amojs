@@ -134,6 +134,15 @@ test('--ssr scaffolds the server variant, and amo build ssr accepts it', async (
   expect(String(await mod.default({}))).toContain('<h1>It runs.</h1>');
 });
 
+test('a directory holding only .git is empty enough — the fresh-repo flow', async () => {
+  await mkdir(join(TMP, 'repo-dir/.git'), { recursive: true });
+  await writeFile(join(TMP, 'repo-dir/.git/HEAD'), 'ref: refs/heads/main');
+  const { stdout } = await run(process.execPath, [CREATE, 'repo-dir'], { cwd: TMP });
+  expect(stdout).toContain('created repo-dir');
+  await readFile(join(TMP, 'repo-dir/src/pages/index.js'), 'utf8'); // scaffolded
+  expect(await readFile(join(TMP, 'repo-dir/.git/HEAD'), 'utf8')).toContain('main'); // untouched
+});
+
 test('refuses a non-empty directory', async () => {
   await mkdir(join(TMP, 'taken'), { recursive: true });
   await writeFile(join(TMP, 'taken/file.txt'), 'x');
