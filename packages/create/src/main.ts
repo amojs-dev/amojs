@@ -19,8 +19,8 @@
 import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createInterface } from 'node:readline/promises';
 import { TEMPLATE_DEPS } from './deps.js';
+import { select } from './prompt.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = join(HERE, '../template');
@@ -78,20 +78,20 @@ async function main(argv: string[]): Promise<void> {
   }
 
   // ask only what the flags left open, and only on a real terminal
-  if ((mode === undefined || ts === undefined) && process.stdin.isTTY && process.stdout.isTTY) {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
+  if (process.stdin.isTTY && process.stdout.isTTY) {
     if (mode === undefined) {
-      const a = (await rl.question('static site (ssg) or server-rendered (ssr)? [ssg] '))
-        .trim()
-        .toLowerCase();
-      if (a !== '' && a !== 'ssg' && a !== 'ssr') fail(`create-amojs: "${a}" is not a mode`);
-      mode = a === 'ssr' ? 'ssr' : 'ssg';
+      mode = (await select('What are you building?', [
+        { value: 'ssg', label: 'ssg', hint: '— static site: pages render to .html at build time' },
+        { value: 'ssr', label: 'ssr', hint: '— server-rendered: pages render per request' },
+      ])) as 'ssg' | 'ssr';
     }
     if (ts === undefined) {
-      const a = (await rl.question('TypeScript? (y/N) ')).trim().toLowerCase();
-      ts = a === 'y' || a === 'yes';
+      ts =
+        (await select('Language?', [
+          { value: 'js', label: 'JavaScript' },
+          { value: 'ts', label: 'TypeScript', hint: '— same files, plus one tsconfig' },
+        ])) === 'ts';
     }
-    rl.close();
   }
   mode ??= 'ssg';
   ts ??= false;
