@@ -18,21 +18,27 @@ export interface BuildResult {
   copied: string[];
 }
 
+export interface BuildOptions extends CompileOptions {
+  /** src-relative directory paths to skip entirely (e.g. 'islands') */
+  exclude?: string[];
+}
+
 const JS_EXT = new Set(['.js', '.mjs']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
 
 export async function buildDir(
   srcDir: string,
   outDir: string,
-  opts: CompileOptions = {},
+  opts: BuildOptions = {},
 ): Promise<BuildResult> {
   const result: BuildResult = { compiled: [], copied: [] };
+  const excluded = new Set((opts.exclude ?? []).map((p) => join(p)));
 
   async function walk(dir: string): Promise<void> {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const src = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) await walk(src);
+        if (!SKIP_DIRS.has(entry.name) && !excluded.has(relative(srcDir, src))) await walk(src);
         continue;
       }
       const rel = relative(srcDir, src);

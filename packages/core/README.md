@@ -184,10 +184,11 @@ Stated plainly, because finding out later is worse:
   question: pages receive *resolved* data, so there is no `resource()`
   primitive in core and none is planned.
 - **Server rendering lives in the compiler, not here.**
-  [`@amojs.dev/cli`](https://www.npmjs.com/package/@amojs.dev/cli)'s `amo ssg`
-  renders pages to static HTML at build time from the same templates — static
-  islands, never hydration, so a page with no island ships zero script bytes.
-  Nothing in this package runs on the server.
+  [`@amojs.dev/cli`](https://www.npmjs.com/package/@amojs.dev/cli)'s
+  `amo build ssg` renders pages to static HTML at build time from the same
+  templates (`amo build ssr` does it per request) — static islands, never
+  hydration, so a page with no island ships zero script bytes. Nothing in
+  this package runs on the server.
 - **No documentation site yet.** [amojs.dev](https://amojs.dev) is currently a
   landing page.
 - **No deep reactivity, deliberately.** There is no Proxy layer. Replace the

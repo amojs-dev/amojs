@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/compiler",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS compiler — parse → IR → codegen (DOM and SSR string targets). Runs on node only; never ships to browsers.",

@@ -1,5 +1,5 @@
 /**
- * THE CLI E2E TEST — v0.4b closed end to end.
+ * THE CLI E2E TEST — the shipped binary, end to end.
  *
  * Not a unit test of argument parsing: it builds the REAL artifacts
  * (tsc → dist for compiler + cli) and then spawns `node dist/main.js`
@@ -44,21 +44,151 @@ const APP = [
   'export const el = html`<p>${signal(1)}</p>`;',
 ].join('\n');
 
-test('amo build: compiles the fixture project through the real binary', async () => {
+test('amo build <mode> <src> <out>: csr compiles the fixture project', async () => {
   await write('proj/src/app.js', APP);
   await write('proj/src/util.js', 'export const inc = (n) => n + 1;');
   await write('proj/assets/style.css', 'p { color: red }');
 
   const { stdout } = await run(process.execPath, [
-    AMO, 'build', join(TMP, 'proj'), join(TMP, 'dist-build'),
+    AMO, 'build', 'csr', join(TMP, 'proj'), join(TMP, 'dist-build'),
   ]);
   expect(stdout).toContain('amo build — 1 compiled, 2 copied');
+  expect(stdout).not.toContain('islands'); // csr has no islands pass
 
   const app = await readFile(join(TMP, 'dist-build/src/app.js'), 'utf8');
   expect(app).toContain('_$t(');
   expect(app).not.toContain('html`');
   const css = await readFile(join(TMP, 'dist-build/assets/style.css'), 'utf8');
   expect(css).toBe('p { color: red }');
+});
+
+test('amo build: bare invocation defaults to csr, src/ → dist/', async () => {
+  await write('proj-default/src/app.js', APP);
+
+  const { stdout } = await run(process.execPath, [AMO, 'build'], {
+    cwd: join(TMP, 'proj-default'),
+  });
+  expect(stdout).toContain('amo build — 1 compiled, 0 copied → dist');
+
+  const app = await readFile(join(TMP, 'proj-default/dist/app.js'), 'utf8');
+  expect(app).toContain('_$t(');
+});
+
+test('amo build ssr: server target plus an automatic islands pass', async () => {
+  await write(
+    'proj-ssr/src/pages/product.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default ({ name }) => html`<h1>${name}</h1>`;',
+    ].join('\n'),
+  );
+  await write(
+    'proj-ssr/src/islands/counter.js',
+    [
+      "import { signal, html, mount } from '@amojs.dev/core';",
+      'const n = signal(0);',
+      "mount(document.body, () => html`<button onclick=${() => n.value++}>${n}</button>`);",
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'ssr', join(TMP, 'proj-ssr/src'), join(TMP, 'dist-ssr'),
+  ]);
+  expect(stdout).toContain('amo build ssr — 1 compiled');
+  expect(stdout).toContain('islands — 1 compiled, 0 copied →');
+
+  // the page is server code: strings, not DOM walks
+  const page = await readFile(join(TMP, 'dist-ssr/pages/product.js'), 'utf8');
+  expect(page).not.toContain('_$t(');
+  expect(page).toContain('_$c(name)');
+  // the island is DOM code, NOT server-compiled by the tree pass
+  const island = await readFile(join(TMP, 'dist-ssr/islands/counter.js'), 'utf8');
+  expect(island).toContain('_$t(');
+  expect(island).not.toContain('_$c(');
+
+  // import the page and render twice, the way an http handler does
+  const mod = (await import(
+    pathToFileURL(join(TMP, 'dist-ssr/pages/product.js')).href
+  )) as { default: (p: { name: string }) => { __amoHtml: string } };
+  expect(String(mod.default({ name: 'Laptop' }))).toBe('<h1>Laptop</h1>');
+  expect(String(mod.default({ name: '<script>' }))).toBe('<h1>&lt;script></h1>');
+});
+
+test('amo build ssr: no islands dir is skipped out loud, not an error', async () => {
+  await write(
+    'proj-ssr2/src/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<p>hi</p>`;',
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'ssr', join(TMP, 'proj-ssr2/src'), join(TMP, 'dist-ssr2'),
+  ]);
+  expect(stdout).toContain('amo build ssr — 1 compiled');
+  expect(stdout).toContain('islands — none');
+});
+
+test('amo build ssg: renders pages to static html, islands pass included', async () => {
+  await write(
+    'proj-ssg/src/pages/index.js',
+    [
+      "import { html, signal } from '@amojs.dev/core';",
+      'const n = signal(2);',
+      'export default () => html`<html lang="en"><head><title>t</title></head><body><p>n:${n}</p></body></html>`;',
+    ].join('\n'),
+  );
+  await write(
+    'proj-ssg/src/islands/counter.js',
+    [
+      "import { signal, html, mount } from '@amojs.dev/core';",
+      'const n = signal(0);',
+      "mount(document.body, () => html`<button onclick=${() => n.value++}>${n}</button>`);",
+    ].join('\n'),
+  );
+  await write('proj-ssg/src/styles/site.css', 'p { color: teal }');
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'ssg', join(TMP, 'proj-ssg/src'), join(TMP, 'dist-ssg'),
+  ]);
+  expect(stdout).toContain('amo build ssg — 1 page rendered, 1 asset copied');
+  expect(stdout).toContain('islands — 1 compiled');
+
+  const page = await readFile(join(TMP, 'dist-ssg/index.html'), 'utf8');
+  expect(page.startsWith('<!doctype html>\n<html lang="en">')).toBe(true);
+  expect(page).toContain('<p>n:2</p>');
+  expect(page).not.toContain('<script'); // no island <script> written → zero script bytes
+
+  const island = await readFile(join(TMP, 'dist-ssg/islands/counter.js'), 'utf8');
+  expect(island).toContain('_$t(');
+  const css = await readFile(join(TMP, 'dist-ssg/styles/site.css'), 'utf8');
+  expect(css).toBe('p { color: teal }');
+});
+
+test('amo build --islands: overrides the islands folder name', async () => {
+  await write(
+    'proj-isl/src/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<p>hi</p>`;',
+    ].join('\n'),
+  );
+  await write(
+    'proj-isl/src/widgets/w.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export const el = html`<b>${1}</b>`;',
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'ssr', join(TMP, 'proj-isl/src'), join(TMP, 'dist-isl'),
+    '--islands', 'widgets',
+  ]);
+  expect(stdout).toContain('islands — 1 compiled');
+  const w = await readFile(join(TMP, 'dist-isl/widgets/w.js'), 'utf8');
+  expect(w).toContain('_$t(');
 });
 
 test('amo eject: output through the real binary has zero bare amojs imports', async () => {
@@ -90,69 +220,41 @@ test('amo eject --runtime: custom runtime directory name', async () => {
   expect(app).toContain('../vendor/');
 });
 
-test('amo ssg: renders pages to static html through the real binary', async () => {
-  await write(
-    'proj4/pages/index.js',
-    [
-      "import { html, signal } from '@amojs.dev/core';",
-      'const n = signal(2);',
-      'export default () => html`<html lang="en"><head><title>t</title></head><body><p>n:${n}</p></body></html>`;',
-    ].join('\n'),
-  );
+test('amo: the removed forms fail with pointed messages', async () => {
+  await write('proj-old/src/app.js', APP);
 
-  const { stdout } = await run(process.execPath, [
-    AMO, 'ssg', join(TMP, 'proj4'), join(TMP, 'dist-ssg'),
-  ]);
-  expect(stdout).toContain('amo ssg — 1 page rendered');
-
-  const page = await readFile(join(TMP, 'dist-ssg/index.html'), 'utf8');
-  expect(page.startsWith('<!doctype html>\n<html lang="en">')).toBe(true);
-  expect(page).toContain('<p>n:2</p>');
-  expect(page).not.toContain('<script'); // no islands written → zero script bytes
-});
-
-test('amo build --target server: request-time SSR through the real binary', async () => {
-  // one page, one prop — the whole point is that the SAME module renders
-  // different HTML per call, which is what a request handler needs
-  await write(
-    'proj5/pages/product.js',
-    [
-      "import { html } from '@amojs.dev/core';",
-      'export default ({ name }) => html`<h1>${name}</h1>`;',
-    ].join('\n'),
-  );
-
-  const { stdout } = await run(process.execPath, [
-    AMO, 'build', join(TMP, 'proj5'), join(TMP, 'dist-server'), '--target', 'server',
-  ]);
-  expect(stdout).toContain('amo build (server target) — 1 compiled');
-
-  const out = join(TMP, 'dist-server/pages/product.js');
-  const code = await readFile(out, 'utf8');
-  expect(code).not.toContain('_$t('); // no DOM backend
-  expect(code).toContain('_$c(name)'); // string concatenation instead
-
-  // import it and render twice, the way an http handler does
-  const mod = (await import(pathToFileURL(out).href)) as {
-    default: (p: { name: string }) => { __amoHtml: string };
-  };
-  expect(String(mod.default({ name: 'Laptop' }))).toBe('<h1>Laptop</h1>');
-  expect(String(mod.default({ name: '<script>' }))).toBe('<h1>&lt;script></h1>');
-  // the field stays available for code that wants to check the shape
-  expect(mod.default({ name: 'x' }).__amoHtml).toBe('<h1>x</h1>');
-});
-
-test('amo: --target is rejected on the commands it cannot mean anything for', async () => {
-  for (const cmd of ['ssg', 'eject']) {
-    const err = await run(process.execPath, [
-      AMO, cmd, join(TMP, 'proj5'), join(TMP, 'dist-nope'), '--target', 'server',
-    ]).then(() => null, (e: Error & { stderr?: string }) => e);
-    expect(err?.stderr).toContain('--target only applies to build');
-  }
-  const bad = await run(process.execPath, [
-    AMO, 'build', join(TMP, 'proj5'), join(TMP, 'dist-nope'), '--target', 'node',
+  // amo ssg <src> <out> — moved under build
+  const ssg = await run(process.execPath, [
+    AMO, 'ssg', join(TMP, 'proj-old/src'), join(TMP, 'dist-old'),
   ]).then(() => null, (e: Error & { stderr?: string }) => e);
-  expect(bad?.stderr).toContain('--target must be "dom" or "server"');
+  expect(ssg?.stderr).toContain('use: amo build ssg');
+
+  // --target — replaced by modes
+  const target = await run(process.execPath, [
+    AMO, 'build', join(TMP, 'proj-old/src'), join(TMP, 'dist-old'), '--target', 'server',
+  ]).then(() => null, (e: Error & { stderr?: string }) => e);
+  expect(target?.stderr).toContain('use a mode instead');
+
+  // amo build <src> <out> — the modeless two-positional form
+  const modeless = await run(process.execPath, [
+    AMO, 'build', join(TMP, 'proj-old/src'), join(TMP, 'dist-old'),
+  ]).then(() => null, (e: Error & { stderr?: string }) => e);
+  expect(modeless?.stderr).toContain('is not a mode');
+
+  // flags on modes they cannot mean anything for
+  const pages = await run(process.execPath, [
+    AMO, 'build', 'ssr', join(TMP, 'proj-old/src'), join(TMP, 'dist-old'), '--pages', 'p',
+  ]).then(() => null, (e: Error & { stderr?: string }) => e);
+  expect(pages?.stderr).toContain('--pages only applies to build ssg');
+});
+
+test('amo build: missing default src/ names the convention', async () => {
+  await mkdir(join(TMP, 'empty'), { recursive: true });
+  const err = await run(process.execPath, [AMO, 'build'], { cwd: join(TMP, 'empty') }).then(
+    () => null,
+    (e: Error & { stderr?: string }) => e,
+  );
+  expect(err?.stderr).toContain('no src/ directory here');
 });
 
 test('amo without a valid command exits 1 and prints usage to stderr', async () => {

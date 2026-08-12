@@ -121,6 +121,7 @@ test('ssgDir renders pages to .html — doctype, data, islands script, structure
     'pages/index.js': INDEX_PAGE,
     'pages/guide/intro.js': INTRO_PAGE,
     'lib/card.js': CARD,
+    'styles/site.css': 'h1 { color: teal }',
   });
   const out = join(src, '..', `out-${Math.random().toString(36).slice(2)}`);
   const r = await ssgDir(src, out);
@@ -129,6 +130,11 @@ test('ssgDir renders pages to .html — doctype, data, islands script, structure
     { src: join('pages', 'guide', 'intro.js'), out: join('guide', 'intro.html') },
     { src: join('pages', 'index.js'), out: 'index.html' },
   ]);
+
+  // non-JS assets are copied verbatim to the same src-relative path; modules never are
+  expect(r.assets).toEqual([join('styles', 'site.css')]);
+  expect(await readFile(join(out, 'styles/site.css'), 'utf8')).toBe('h1 { color: teal }');
+  await expect(readFile(join(out, 'lib/card.js'), 'utf8')).rejects.toThrow();
 
   const index = await readFile(join(out, 'index.html'), 'utf8');
   expect(index.startsWith('<!doctype html>\n<html lang="en">')).toBe(true);

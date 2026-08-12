@@ -3,7 +3,7 @@
 The `amo` binary for [AmoJS](https://github.com/amojs-dev/amojs) — a
 fine-grained UI compiler that produces the vanilla JS you would have written.
 
-Zero dependencies beyond AmoJS itself. It is three commands.
+Zero dependencies beyond AmoJS itself. It is two commands.
 
 > **Pre-1.0.** Flags and output layout may change.
 
@@ -16,24 +16,33 @@ npm install --save-dev @amojs.dev/cli
 Or run it without installing:
 
 ```bash
-npx @amojs.dev/cli build src/ dist/
+npx @amojs.dev/cli build
 ```
 
 ## Usage
 
 ```
-amo build <src> <out> [--target dom|server]
-                                      compile amo modules, copy everything else
+amo build [mode] [src] [out]          mode: csr (default) | ssr | ssg
+                                      src defaults to src/, out to dist/
 amo eject <src> <out> [--runtime <dir>]
                                       build, then hand the runtime over and
                                       rewrite every "@amojs.dev/core" import to a
                                       relative path (default dir: amo-runtime)
-amo ssg <src> <out> [--pages <dir>]   render every page module under <src>/pages/
-                                      to static .html
 amo --help | --version
 ```
 
-### `amo build`
+```bash
+amo build              # csr: src/ → dist/, for the browser
+amo build ssr          # server target + automatic islands pass
+amo build ssg          # static .html from src/pages/ + islands pass
+amo build ssg out/     # custom output dir
+amo build ssr app/ out/   # fully explicit
+```
+
+A directory literally named after a mode is written as `./ssr`; the bare word
+always reads as the mode.
+
+### `amo build` (csr)
 
 Walks the project, compiles every module that imports `@amojs.dev/core`, and copies
 everything else through untouched. Templates are hoisted and cloned instead of
@@ -43,8 +52,13 @@ and the template parser is dropped from the output entirely.
 This step is **optional**. AmoJS source already runs in a browser with no build
 at all; `build` only makes it smaller and faster.
 
-`--target server` compiles the same templates into **string concatenation** for
-node instead of DOM calls — see [Rendering per request](#rendering-per-request).
+### Islands (ssr and ssg)
+
+With `ssr` and `ssg`, if `<src>/islands/` exists it is DOM-compiled to
+`<out>/islands/` automatically — those are the interactive pieces of your
+pages, and they are the only client JavaScript a server-rendered site ships.
+No `islands/` folder means a fully static site: the pass is skipped and says
+so. `--islands <dir>` renames the folder (inside `<src>`).
 
 ### `amo eject`
 
@@ -68,18 +82,21 @@ uninstall.
 keeps the exact version the code was written against; the CLI prints where it
 came from.
 
-### `amo ssg`
+### `amo build ssg`
 
 Static pages from the same components — **islands, never hydration**:
 
 ```bash
-amo ssg src/ dist/
+amo build ssg
 ```
 
-Every module under `src/pages/` is a page: its default export (sync or async)
-returns a template, which is rendered **on node** to `dist/<same path>.html`
-with `<!doctype html>` prepended. Signals evaluate once; text and attribute
-holes are escaped; no comment markers are emitted.
+Every module under `src/pages/` (rename with `--pages <dir>`) is a page: its
+default export (sync or async) returns a template, which is rendered **on
+node** to `dist/<same path>.html` with `<!doctype html>` prepended. Signals
+evaluate once; text and attribute holes are escaped; no comment markers are
+emitted. Non-JS files (css, images, fonts) are copied verbatim to the same
+src-relative path; modules never are — pages and layouts are server
+artifacts, and islands ship through the islands pass.
 
 ```js
 // src/pages/index.js
@@ -90,9 +107,9 @@ export default () => html`<html lang="en"><head><title>hi</title></head>
 
 A page with no interactivity ships **zero** script bytes. An interactive
 island is nothing special — a static `<script type="module">` you write in
-the page that imports a normal AmoJS component (compiled by `amo build`) and
-`mount`s it into its container. Give that container intrinsic size: it is
-empty until the island mounts.
+the page that imports a normal AmoJS component (the automatic islands pass
+compiles it) and `mount`s it into its container. Give that container
+intrinsic size: it is empty until the island mounts.
 
 Server data reaches an island through `data-*` attributes on that container,
 not through the script tag — `<script>` content is static (a hole in it is a
@@ -113,26 +130,24 @@ element exists to hand over); a `value` hole on `<textarea>` renders as its
 content; `value` on `<select>` is a build error — put `selected=${…}` on the
 matching `<option>` instead.
 
-### Rendering per request
+### `amo build ssr` — rendering per request
 
-`amo ssg` renders pages when you build. To render them when a request arrives,
-compile the same tree with the server target and call the module yourself:
+`amo build ssg` renders pages when you build. To render them when a request
+arrives, compile with the server target and call the module yourself:
 
 ```bash
-amo build src/ server/ --target server        # pages → strings, on node
-amo build src/islands/ public/islands/        # islands → the browser
+amo build ssr
 ```
 
-Note the second command's source: **islands only, not the whole tree.** Pages
-and layouts are server artifacts. If you point the client build at them, a
-server-only template (a dynamic `<title>`) fails the build — which is how a
-mix-up announces itself instead of shipping.
+Pages and layouts become server artifacts — modules that render to strings on
+node; `src/islands/` is DOM-compiled to `dist/islands/` in the same run, so
+the browser gets only the interactive pieces.
 
 A page is `(props) => template`, so per-request data is just an argument:
 
 ```js
 import { createServer } from 'node:http';
-const page = (await import('./server/pages/product.js')).default;
+const page = (await import('./dist/pages/product.js')).default;
 
 createServer(async (req, res) => {
   const product = await db.find(new URL(req.url, 'http://x').searchParams.get('id'));
@@ -144,7 +159,7 @@ createServer(async (req, res) => {
 That is the entire API. A template evaluates to an object that stringifies to
 its HTML, so **your server installs no AmoJS package at runtime** — the
 compiler is a build-time tool and nothing of ours is in the request path.
-`amo ssg` calls the same pages with `{}`, so one page module serves both.
+`amo build ssg` calls the same pages with `{}`, so one page module serves both.
 
 Three things worth knowing before you deploy:
 

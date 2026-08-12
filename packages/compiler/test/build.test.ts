@@ -44,3 +44,30 @@ test('buildDir compiles amo modules, copies everything else verbatim', async () 
   const css = await readFile(join(TMP, 'dist/assets/style.css'), 'utf8');
   expect(css).toBe('p { color: red }');
 });
+
+const APP_ISLAND = [
+  "import { signal, html } from '@amojs.dev/core';",
+  'export const el = html`<b>${signal(1)}</b>`;',
+].join('\n');
+
+test('buildDir exclude skips a src-relative directory entirely', async () => {
+  await write(
+    'proj-ex/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<p>hi</p>`;',
+    ].join('\n'),
+  );
+  await write('proj-ex/islands/counter.js', APP_ISLAND);
+  await write('proj-ex/deep/islands/nested.js', APP_ISLAND); // same name, not src-relative
+
+  const res = await buildDir(join(TMP, 'proj-ex'), join(TMP, 'dist-ex'), {
+    target: 'server',
+    exclude: ['islands'],
+  });
+
+  const rels = [...res.compiled, ...res.copied];
+  expect(rels).not.toContain(join('islands', 'counter.js'));
+  expect(rels).toContain(join('deep', 'islands', 'nested.js')); // only the root islands/ is excluded
+  await expect(readFile(join(TMP, 'dist-ex/islands/counter.js'), 'utf8')).rejects.toThrow();
+});
