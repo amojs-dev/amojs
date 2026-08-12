@@ -65,6 +65,15 @@ importers:
 
   packages/core: {}
 
+  packages/create:
+    devDependencies:
+      '@amojs.dev/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@amojs.dev/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/router:
     devDependencies:
       '@amojs.dev/core':

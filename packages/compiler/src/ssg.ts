@@ -9,9 +9,10 @@
  *   2. every module under `<src>/<pagesDir>/` is a page: its default export
  *      is called (and awaited) on node, and the resulting template becomes
  *      `<out>/<same path>.html` with `<!doctype html>` prepended;
- *   3. every non-JS file (css, images, fonts) is copied verbatim to the same
- *      src-relative path — modules never are: pages and layouts are server
- *      artifacts, and islands ship through their own DOM build;
+ *   3. every non-module file (css, images, fonts) is copied verbatim to the
+ *      same src-relative path — modules (.js and .ts alike) never are: pages
+ *      and layouts are server artifacts, and islands ship through their own
+ *      DOM build;
  *   4. the temp dir is removed. Nothing here ships to the browser — a page
  *      with no islands emits ZERO script bytes, and an island is just a
  *      static `<script type="module">` the author wrote, compiled separately
@@ -29,7 +30,13 @@
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { buildDir } from './build.js';
+import {
+  buildDir,
+  copyPublicDir,
+  isDeclarationFile,
+  isModuleFile,
+  PUBLIC_DIR,
+} from './build.js';
 
 export interface SsgResult {
   /** rendered pages: source module (src-relative) → emitted html (out-relative) */
@@ -102,8 +109,10 @@ export async function ssgDir(
       for (const entry of await readdir(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) {
+          // src/public/ copies to the OUT ROOT below, not to its own path
+          if (p === join(srcDir, PUBLIC_DIR)) continue;
           if (!SKIP_DIRS.has(entry.name)) await copyAssets(p);
-        } else if (!JS_EXT.has(extname(entry.name))) {
+        } else if (!isModuleFile(entry.name) && !isDeclarationFile(entry.name)) {
           const rel = relative(srcDir, p);
           const dest = join(outDir, rel);
           await mkdir(dirname(dest), { recursive: true });
@@ -113,6 +122,7 @@ export async function ssgDir(
       }
     }
     await copyAssets(srcDir);
+    result.assets.push(...(await copyPublicDir(srcDir, outDir)));
     result.assets.sort();
   } finally {
     await rm(tmp, { recursive: true, force: true });

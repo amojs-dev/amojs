@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="AmoJS">
+  <!-- the app icon: favicon cut on ink, padded to ~68%. The brand violet touches
+       only the signal dot. Source of icon-16/32/48/128/512.png. -->
+  <rect width="96" height="96" rx="20" fill="#0B0C11"/>
+  <g transform="translate(15.4 15.4) scale(0.68)">
+    <path d="M24 72 L68 28" stroke="#F6F7F5" stroke-width="17"/>
+    <rect x="46" y="6" width="44" height="44" fill="#F6F7F5"/>
+    <circle cx="24" cy="72" r="17" fill="#8B7BFF"/>
+  </g>
+</svg>

@@ -23,7 +23,7 @@ npm install --save-dev @amojs.dev/compiler
 ## API
 
 ```js
-import { compileModule, buildDir, ejectDir, ssgDir } from '@amojs.dev/compiler';
+import { compileModule, buildDir, ejectDir, ssgDir, vendorCore } from '@amojs.dev/compiler';
 
 // one module, source in → source out
 const compiled = compileModule(source);
@@ -34,10 +34,15 @@ const compiled = compileModule(source);
 const server = compileModule(source, { target: 'server' });
 
 // a whole project: compile amo modules, copy everything else verbatim
+// (src/public/** goes to the ROOT of dist, uncompiled)
 await buildDir('src', 'dist');
 
 // render every page module under src/pages/ to static .html on node
 await ssgDir('src', 'dist');
+
+// make a built islands dir self-contained: copy core's browser bundle to
+// dist/_amo/ and rewrite island core imports to reach it relatively
+await vendorCore('dist', 'dist/islands', 'src');
 
 // build, then hand the runtime over and rewrite every "@amojs.dev/core" specifier
 // to a relative path, so the output has no bare imports left at all
@@ -75,8 +80,9 @@ boundaries, lazy-loading, closure serialization, or dead code. That is a
 feature — a purely local, mechanical source-to-source rewrite can be trusted
 next to any other tool in your pipeline.
 
-It parses JavaScript. If you write TypeScript, strip types first: `TS → JS`,
-then `amo build`.
+It parses JavaScript. TypeScript input to `buildDir`/`ssgDir` is type-stripped
+first (node's own `stripTypeScriptTypes`, erasable syntax only) and emitted as
+`.js` — the stripping happens before the compiler, never inside it.
 
 ## License
 

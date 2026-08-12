@@ -1,27 +1,26 @@
 {
-  "name": "@amojs.dev/cli",
+  "name": "create-amojs",
   "version": "0.11.0",
   "type": "module",
   "license": "MIT",
-  "description": "AmoJS CLI — `amo build` | `dev` | `serve` (csr | ssr | ssg) and `amo eject`. The framework you can uninstall.",
+  "description": "Scaffold an AmoJS project — `npm create amojs my-app`. Two questions (ssg or ssr, JS or TS), zero infrastructure files.",
   "keywords": [
     "amojs",
-    "cli",
-    "build",
-    "eject",
-    "ssg",
-    "compiler"
+    "create",
+    "scaffold",
+    "template",
+    "starter"
   ],
   "homepage": "https://amojs.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/amojs-dev/amojs.git",
-    "directory": "packages/cli"
+    "directory": "packages/create"
   },
   "bugs": "https://github.com/amojs-dev/amojs/issues",
   "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
   "bin": {
-    "amo": "./dist/main.js"
+    "create-amojs": "./dist/main.js"
   },
   "engines": {
     "node": ">=22"
@@ -29,12 +28,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
   },
-  "dependencies": {
-    "@amojs.dev/compiler": "workspace:*",
+  "devDependencies": {
+    "@amojs.dev/cli": "workspace:*",
     "@amojs.dev/core": "workspace:*"
   },
   "files": [
-    "dist"
+    "dist",
+    "template"
   ],
   "publishConfig": {
     "access": "public"

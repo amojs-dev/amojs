@@ -17,3 +17,4 @@ export * from './build.js';
 export * from './eject.js';
 export * from './diagnose.js';
 export * from './ssg.js';
+export * from './vendor.js';

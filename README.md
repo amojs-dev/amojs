@@ -38,8 +38,9 @@ mount(Counter, document.getElementById('app'));
 |---|---|---|
 | [`@amojs.dev/core`](packages/core) | the runtime — signals, `` html`` ``, `mount`. Plain JS, ships to browsers raw. Subpaths `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled` never load the template parser; `…/browser` and `…/browser/runtime` are prebuilt single files for one-request loading. | yes |
 | [`@amojs.dev/compiler`](packages/compiler) | parse → IR → codegen for **two targets** (DOM, and strings for node), plus `build`, `eject`, `ssg` and `diagnose`. TypeScript, runs on node only. | yes |
-| [`@amojs.dev/cli`](packages/cli) | the `amo` binary — `amo build` (csr \| ssr \| ssg) and `amo eject`. | yes |
-| [`@amojs.dev/vite`](packages/vite) | Vite plugin — compiles templates during a normal Vite build, so tree-shaking, splitting and the dev server are Vite's job. | not yet |
+| [`@amojs.dev/cli`](packages/cli) | the `amo` binary — `amo build` \| `dev` \| `serve` (each × csr \| ssr \| ssg) and `amo eject`. TypeScript input, `public/` root assets, self-contained islands. | yes |
+| [`create-amojs`](packages/create) | the scaffold — `npm create amojs my-app`: ssg or ssr, JS or TS. | not yet |
+| [`@amojs.dev/vite`](packages/vite) | Vite plugin — compiles templates during a normal Vite build, so tree-shaking, splitting and the dev server are Vite's job. | yes |
 | [`@amojs.dev/router`](packages/router) | routing on the Navigation API — pages get *resolved* data, so no page ever renders a loading state. Parser-free; `amo eject` hands it over too. | yes |
 | `@amojs.dev/bench` | micro-benchmarks. Competitor libraries are quarantined here so the runtime keeps zero dependencies. | never |
 

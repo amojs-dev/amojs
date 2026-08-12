@@ -45,6 +45,25 @@ test('buildDir compiles amo modules, copies everything else verbatim', async () 
   expect(css).toBe('p { color: red }');
 });
 
+test('src/public/ copies verbatim to the out ROOT and is never compiled', async () => {
+  await write('proj-pub/src/app.js', 'export const a = 1;');
+  await write('proj-pub/public/favicon.svg', '<svg/>');
+  await write('proj-pub/public/fonts/x.woff2', 'binaryish');
+  // a module inside public/ is a root asset, not build input — verbatim, ts and all
+  await write('proj-pub/public/sw.js', 'const keep: any = 1; // not stripped, not compiled');
+
+  const res = await buildDir(join(TMP, 'proj-pub'), join(TMP, 'dist-pub'));
+
+  expect(res.copied).toContain('favicon.svg');
+  expect(res.copied).toContain(join('fonts', 'x.woff2'));
+  const svg = await readFile(join(TMP, 'dist-pub/favicon.svg'), 'utf8');
+  expect(svg).toBe('<svg/>');
+  const sw = await readFile(join(TMP, 'dist-pub/sw.js'), 'utf8');
+  expect(sw).toContain('const keep: any = 1;'); // untouched
+  // it does NOT also appear under public/
+  await expect(readFile(join(TMP, 'dist-pub/public/favicon.svg'), 'utf8')).rejects.toThrow();
+});
+
 const APP_ISLAND = [
   "import { signal, html } from '@amojs.dev/core';",
   'export const el = html`<b>${signal(1)}</b>`;',
