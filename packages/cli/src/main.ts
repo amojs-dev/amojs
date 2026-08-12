@@ -336,6 +336,7 @@ async function main(argv: string[]): Promise<void> {
       srcDir: src,
       outDir: out,
       port,
+      islandsDir: mode === 'csr' ? null : islands,
       ssr: mode === 'ssr' ? { pagesDir: pagesDir ?? 'pages', islandsDir: islands } : undefined,
       build: () => runBuild(job),
     });

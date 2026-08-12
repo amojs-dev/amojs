@@ -9,6 +9,7 @@
  */
 import { test, expect, beforeAll, afterAll } from 'vitest';
 import { execFile, spawn } from 'node:child_process';
+import { classify } from '../src/hmr.js';
 import { promisify } from 'node:util';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -391,6 +392,111 @@ test('amo dev ssr: renders per request and re-imports pages after a rebuild', as
     await until('<p>one /</p>');
     await write('proj-devssr/src/pages/index.js', SSR_PAGE('two'));
     await until('<p>two /</p>'); // fresh import, not node's cached module
+  } finally {
+    child.kill();
+  }
+}, 30_000);
+
+test('classify: css swaps, islands re-mount, anything else reloads', () => {
+  const opts = { islandsDir: 'islands', v: 3 };
+  expect(classify(['styles/site.css'], opts)).toEqual({ type: 'css', v: 3 });
+  expect(classify(['public/theme.css', 'styles/a.css'], opts)).toEqual({ type: 'css', v: 3 });
+  expect(classify(['islands/counter.ts'], opts)).toEqual({
+    type: 'island',
+    paths: ['/islands/counter.js'],
+    v: 3,
+  });
+  expect(classify(['islands/a.js', 'islands/deep/b.js'], opts)).toEqual({
+    type: 'island',
+    paths: ['/islands/a.js', '/islands/deep/b.js'],
+    v: 3,
+  });
+  // a page changed → server HTML changed → nothing to swap client-side
+  expect(classify(['pages/index.js'], opts)).toEqual({ type: 'reload' });
+  // mixed batches take the safe road
+  expect(classify(['styles/site.css', 'pages/index.js'], opts)).toEqual({ type: 'reload' });
+  // csr has no islands dir — island-looking paths still reload
+  expect(classify(['islands/counter.js'], { islandsDir: null, v: 1 })).toEqual({
+    type: 'reload',
+  });
+});
+
+test('amo dev: injects the dev client and answers the SSE endpoint; build output stays clean', async () => {
+  await write(
+    'proj-hmr/src/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<html lang="en"><head><title>t</title></head><body><p>hi</p></body></html>`;',
+    ].join('\n'),
+  );
+
+  const port = 5400 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'dev', 'ssg', join(TMP, 'proj-hmr/src'), join(TMP, 'dist-hmr'), '--port', String(port),
+  ]);
+  try {
+    const get = async (path: string) => {
+      for (let i = 0; i < 100; i++) {
+        try {
+          return await fetch(`http://localhost:${port}${path}`);
+        } catch {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      }
+      throw new Error(`dev never answered on :${port}`);
+    };
+
+    // served html carries the client; the built file on disk does not
+    const html = await (await get('/')).text();
+    expect(html).toContain('/_amo/dev.js');
+    const built = await readFile(join(TMP, 'dist-hmr/index.html'), 'utf8');
+    expect(built).not.toContain('/_amo/dev.js');
+
+    const client = await get('/_amo/dev.js');
+    expect(client.status).toBe(200);
+    expect(await client.text()).toContain('EventSource');
+
+    // the event stream greets and stays open
+    const events = await get('/_amo/events');
+    expect(events.headers.get('content-type')).toBe('text/event-stream');
+    const reader = events.body!.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    expect(first).toContain(':connected');
+    await reader.cancel();
+  } finally {
+    child.kill();
+  }
+}, 30_000);
+
+test('amo serve: never injects the dev client', async () => {
+  await write(
+    'proj-noinj/src/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<html lang="en"><head><title>t</title></head><body><p>prod</p></body></html>`;',
+    ].join('\n'),
+  );
+  await run(process.execPath, [
+    AMO, 'build', 'ssg', join(TMP, 'proj-noinj/src'), join(TMP, 'dist-noinj'),
+  ]);
+
+  const port = 5650 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'serve', join(TMP, 'dist-noinj'), '--port', String(port),
+  ]);
+  try {
+    let body = '';
+    for (let i = 0; i < 100; i++) {
+      try {
+        body = await (await fetch(`http://localhost:${port}/`)).text();
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
+    expect(body).toContain('<p>prod</p>');
+    expect(body).not.toContain('/_amo/dev.js');
+    expect((await fetch(`http://localhost:${port}/_amo/events`)).status).toBe(404);
   } finally {
     child.kill();
   }

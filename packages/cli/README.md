@@ -62,9 +62,21 @@ url must be exact.
 
 The dev loop: one build, then watch `<src>`, rebuild on change, and serve
 `<out>` with pretty urls (`/docs/` answers from `docs/index.html`). A rebuild
-that fails prints its error and keeps serving the last good build. There is no
-HMR and none is wanted — a full rebuild is well under a second, and a refresh
-really is enough.
+that fails prints its error and keeps serving the last good build.
+
+Open tabs update themselves, each change taking the cheapest honest path:
+
+- **css** — stylesheets swap in place: no reload, island state survives
+- **an island** — the changed island re-imports and **re-mounts in place**
+  (a dev-only mount facade removes the old version's DOM first). Its local
+  state resets, and the old version's timers linger until a real reload —
+  said plainly rather than pretended away.
+- **anything else** (pages, lib, public) — the page is server-rendered HTML,
+  so there is no client module to swap: the browser reloads itself.
+
+The channel is one SSE endpoint and a small client injected into served
+HTML — never into the build: `dist/` and `amo serve` output stay
+byte-identical to production. Zero dependencies, as ever.
 
 ```bash
 amo dev ssg            # the docs-site loop: src/ → dist/, on :4700

@@ -8,6 +8,6 @@
  */
 export const TEMPLATE_DEPS = {
   '@amojs.dev/core': '^0.8.1',
-  '@amojs.dev/cli': '^0.11.0',
+  '@amojs.dev/cli': '^0.12.0',
   typescript: '^7.0.0', // --ts only; verified against the template tsconfig
 } as const;

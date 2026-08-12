@@ -15,11 +15,13 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { Server, ServerResponse } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { DEV_CLIENT } from './hmr.js';
+import type { DevChannel } from './hmr.js';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -57,6 +59,19 @@ export interface ServeOptions {
   ssr?: SsrOptions;
   /** dev sets 'no-store'; a production serve sends no cache header at all */
   cacheControl?: string;
+  /**
+   * dev only: expose /_amo/events (SSE) + /_amo/dev.js and inject the dev
+   * client into every html response. `amo serve` never passes this — built
+   * output and served bytes stay identical to production.
+   */
+  dev?: DevChannel;
+}
+
+/** the dev client rides at the end of <body>; served html only, never dist */
+function withDevClient(html: string): string {
+  const tag = '<script type="module" src="/_amo/dev.js"></script>';
+  const at = html.lastIndexOf('</body>');
+  return at === -1 ? html + tag : html.slice(0, at) + tag + html.slice(at);
 }
 
 /** decoded, normalized, query-stripped, traversal-stripped url path */
@@ -112,9 +127,34 @@ export function startServer(o: ServeOptions): Server {
   const server = createServer(async (req, res) => {
     const clean = cleanPath(req.url ?? '/');
 
+    if (o.dev) {
+      if (clean === join('/', '_amo', 'dev.js')) {
+        head(res, 200, TYPES['.js'], o);
+        res.end(DEV_CLIENT);
+        return;
+      }
+      if (clean === join('/', '_amo', 'events')) {
+        res.writeHead(200, {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-store',
+          connection: 'keep-alive',
+        });
+        res.write(':connected\n\n');
+        o.dev.clients.add(res);
+        req.on('close', () => o.dev?.clients.delete(res));
+        return;
+      }
+    }
+
     const file = await findFile(o, clean);
     if (file) {
-      head(res, 200, TYPES[extname(file)] ?? 'application/octet-stream', o);
+      const type = TYPES[extname(file)] ?? 'application/octet-stream';
+      if (o.dev && extname(file) === '.html') {
+        head(res, 200, type, o);
+        res.end(withDevClient(await readFile(file, 'utf8')));
+        return;
+      }
+      head(res, 200, type, o);
       createReadStream(file).pipe(res);
       return;
     }
@@ -136,7 +176,8 @@ export function startServer(o: ServeOptions): Server {
             throw new Error(`${page} did not return a template — a page returns html\`…\``);
           }
           head(res, 200, 'text/html; charset=utf-8', o);
-          res.end('<!doctype html>\n' + out.__amoHtml + '\n');
+          const doc = '<!doctype html>\n' + out.__amoHtml + '\n';
+          res.end(o.dev ? withDevClient(doc) : doc);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           process.stderr.write(`amo: ${clean} failed to render — ${msg}\n`);

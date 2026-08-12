@@ -25,7 +25,7 @@ No infrastructure files — the CLI owns the pipeline:
 ```bash
 cd my-app
 npm install
-npm run dev       # build + watch + serve — refresh really is enough
+npm run dev       # build + watch + serve — css hot-swaps, islands re-mount
 npm run build     # ssg: static .html · ssr: server modules
 npm run serve     # run what build made (for ssr, this IS the server)
 ```
