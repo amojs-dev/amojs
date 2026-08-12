@@ -6,7 +6,7 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +30,8 @@ beforeAll(async () => {
   await run(process.execPath, [TSC, '-p', join(ROOT, 'packages/cli/tsconfig.build.json')]);
   await run(process.execPath, [TSC, '-p', join(HERE, '../tsconfig.build.json')]);
   await run(process.execPath, [join(ROOT, 'packages/core/scripts/bundle.mjs')]);
+  // core's generated types too — the --ts scaffold is type-checked below
+  await run(process.execPath, [TSC, '-p', join(ROOT, 'packages/core/tsconfig.build.json')]);
   await mkdir(TMP, { recursive: true });
 }, 120_000);
 
@@ -94,6 +96,13 @@ test('--ts scaffolds .ts sources plus one tsconfig, and it still builds', async 
   expect(built).toContain('1 page rendered');
   const html = await readFile(join(app, 'dist/index.html'), 'utf8');
   expect(html).toContain('<h1>It runs.</h1>');
+
+  // `npm run check` must pass on a fresh scaffold — a starter that fails its
+  // own type-check shipped once (getElementById is Element | null) and never
+  // again. Core is linked in the way npm install would place it.
+  await mkdir(join(app, 'node_modules/@amojs.dev'), { recursive: true });
+  await symlink(join(ROOT, 'packages/core'), join(app, 'node_modules/@amojs.dev/core'));
+  await run(process.execPath, [TSC, '--noEmit'], { cwd: app });
 });
 
 test('--ssr scaffolds the server variant, and amo build ssr accepts it', async () => {
