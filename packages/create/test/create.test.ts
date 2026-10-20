@@ -213,6 +213,12 @@ test('--csr --ts renames the entry to main.ts, type-checks, and still builds', a
   await run(process.execPath, [TSC, '--noEmit'], { cwd: app });
 });
 
+test('a bare -- is ignored — npx forwards it, npm create strips it', async () => {
+  const { stdout } = await run(process.execPath, [CREATE, 'my-dd', '--', '--csr'], { cwd: TMP });
+  expect(stdout).toContain('created my-dd (csr)');
+  await readFile(join(TMP, 'my-dd/src/index.html'), 'utf8');
+});
+
 test('--csr refuses the island flags — the whole app is client code', async () => {
   const err = await run(process.execPath, [CREATE, 'my-bad', '--csr', '--no-island'], {
     cwd: TMP,

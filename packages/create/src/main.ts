@@ -70,6 +70,7 @@ async function main(argv: string[]): Promise<void> {
       process.stdout.write(USAGE);
       return;
     }
+    if (a === '--') continue; // npx forwards it literally; npm create strips it
     if (a === '--ts' || a === '--template=typescript') ts = true;
     else if (a === '--js') ts = false;
     else if (a === '--ssg') mode = 'ssg';
