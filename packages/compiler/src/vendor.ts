@@ -16,6 +16,9 @@
  *
  * Resolution is project-first, the same rule eject follows: the project's own
  * installed core is the version its code was written against.
+ *
+ * csr builds pass the whole <out> as islandsOut — in a client-rendered app
+ * every compiled module is browser code.
  */
 
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
@@ -84,6 +87,9 @@ export async function vendorCore(
   const files: string[] = [];
   async function walk(dir: string): Promise<void> {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
+      // never rewrite our own output — csr passes the whole <out>, which
+      // holds _amo/ from the previous dev rebuild
+      if (entry.isDirectory() && entry.name === VENDOR_DIR) continue;
       const p = join(dir, entry.name);
       if (entry.isDirectory()) await walk(p);
       else if (['.js', '.mjs'].includes(extname(entry.name))) files.push(p);

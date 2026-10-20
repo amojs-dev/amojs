@@ -117,6 +117,11 @@ everything else through untouched. Templates are hoisted and cloned instead of
 parsed at runtime, holes become positional node walks decided at build time,
 and the template parser is dropped from the output entirely.
 
+The output is self-contained: core's prebuilt browser bundle is copied to
+`<out>/_amo/` and every compiled module's `@amojs.dev/core` import is rewritten
+to reach it relatively — no importmap to write, and one core url for the whole
+app. A project whose modules never import core vendors nothing.
+
 This step is **optional**. AmoJS source already runs in a browser with no build
 at all; `build` only makes it smaller and faster.
 

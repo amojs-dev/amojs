@@ -30,10 +30,11 @@ Usage:
            node; import a page and call it with that request's props
     ssg    render every page module under <src>/pages/ to static .html
 
-    with ssr and ssg, <src>/islands/ (if present) is DOM-compiled to
-    <out>/islands/ automatically, core's browser bundle is copied to
-    <out>/_amo/, and island imports are rewritten to reach it — no
-    importmap to write, one core url for every island
+    browser output is self-contained: core's browser bundle is copied
+    to <out>/_amo/ and compiled core imports are rewritten to reach it
+    — no importmap to write, one core url for the whole app. with ssr
+    and ssg the browser code is <src>/islands/ (if present), which is
+    DOM-compiled to <out>/islands/ automatically
 
     source may be TypeScript — .ts modules are type-stripped (erasable
     syntax only) and emitted as .js; .d.ts files are skipped
@@ -159,6 +160,18 @@ async function runBuild(job: BuildJob): Promise<void> {
             'with that request\'s props.\n'
           : ''),
     );
+    if (mode === 'csr') {
+      // in a client-rendered app every compiled module is browser code, so
+      // the whole <out> gets the same self-contained treatment islands get
+      const v = await vendorCore(out, out, src);
+      if (v.vendored.length > 0) {
+        process.stdout.write(
+          `vendor — core → ${v.vendored.join(', ')} ` +
+            `(${v.rewritten.length} import${v.rewritten.length === 1 ? '' : 's'} ` +
+            'rewritten — no importmap needed)\n',
+        );
+      }
+    }
   }
 
   if (mode !== 'csr') {

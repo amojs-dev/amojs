@@ -1,9 +1,9 @@
 {
   "name": "create-amojs",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "type": "module",
   "license": "MIT",
-  "description": "Scaffold an AmoJS project — `npm create amojs my-app`. Two questions (ssg or ssr, JS or TS), zero infrastructure files.",
+  "description": "Scaffold an AmoJS project — `npm create amojs my-app`. A few questions (ssg, ssr or csr · sample island or pure HTML · JS or TS), zero infrastructure files.",
   "keywords": [
     "amojs",
     "create",

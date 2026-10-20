@@ -235,6 +235,35 @@ test('amo build ssg: islands are self-contained — core vendored, imports rewri
   expect(vendored).toBe(bundle);
 });
 
+test('amo build csr: the output is self-contained — core vendored, imports rewritten', async () => {
+  await write('proj-csr/src/main.js', APP);
+  await write('proj-csr/src/index.html', '<!doctype html><main id="app"></main>');
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'csr', join(TMP, 'proj-csr/src'), join(TMP, 'dist-csr'),
+  ]);
+  expect(stdout).toContain('vendor — core →');
+  expect(stdout).toContain('no importmap needed');
+
+  const main = await readFile(join(TMP, 'dist-csr/main.js'), 'utf8');
+  expect(main).not.toContain('@amojs.dev/core');
+  expect(main).toContain('./_amo/runtime.js');
+
+  const vendored = await readFile(join(TMP, 'dist-csr/_amo/runtime.js'), 'utf8');
+  const bundle = await readFile(
+    join(ROOT, 'packages/core/dist/browser-runtime.js'),
+    'utf8',
+  );
+  expect(vendored).toBe(bundle);
+
+  // a second build over the same out must not rewrite the vendored bundle
+  const { stdout: again } = await run(process.execPath, [
+    AMO, 'build', 'csr', join(TMP, 'proj-csr/src'), join(TMP, 'dist-csr'),
+  ]);
+  expect(again).toContain('vendor — core →');
+  expect(await readFile(join(TMP, 'dist-csr/_amo/runtime.js'), 'utf8')).toBe(bundle);
+});
+
 test('amo build: a TypeScript project compiles with no toolchain of its own', async () => {
   await write(
     'proj-ts/src/app.ts',
