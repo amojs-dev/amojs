@@ -46,7 +46,7 @@ mount(Counter, document.getElementById('app'));
 
 Editor support lives in a separate repository:
 [`amojs-dev/language-tools`](https://github.com/amojs-dev/language-tools) —
-template highlighting, embedded HTML/JS IntelliSense, and inline diagnostics
+template highlighting, HTML completion inside templates, and inline diagnostics
 produced by this compiler's own parser, so the editor and `amo build` cannot
 disagree.
 
