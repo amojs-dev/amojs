@@ -74,6 +74,29 @@ test('scaffolds a JS ssg project (the non-TTY defaults) that the real amo build 
   expect(favicon).toContain('<svg');
 });
 
+test('scaffolding into the current directory skips the `cd .` line, and the shared head is wired', async () => {
+  const app = join(TMP, 'in-place');
+  await mkdir(app, { recursive: true });
+  const { stdout } = await run(process.execPath, [CREATE, '.'], { cwd: app });
+  expect(stdout).toContain('created . (ssg)');
+  expect(stdout).not.toContain('cd .');
+  expect(stdout).toContain('npm install');
+
+  // the one relative import in the template — it teaches the `.js` specifier
+  // rule before a user meets the build error for `./x.ts`
+  const page = await readFile(join(app, 'src/pages/index.js'), 'utf8');
+  expect(page).toContain("from '../lib/head.js'");
+  const head = await readFile(join(app, 'src/lib/head.js'), 'utf8');
+  expect(head).toContain('export const head');
+
+  const { stdout: built } = await run(process.execPath, [AMO, 'build', 'ssg', 'src', 'dist'], { cwd: app });
+  expect(built).toContain('1 page rendered');
+  const html = await readFile(join(app, 'dist/index.html'), 'utf8');
+  expect(html).toContain('<meta charset="utf-8">'); // head() rendered inside <head>
+  expect(html).toContain('<title>my amo app</title>');
+  await expect(readFile(join(app, 'dist/lib/head.js'), 'utf8')).rejects.toThrow(); // server code never ships
+});
+
 test('--ts scaffolds .ts sources plus one tsconfig, and it still builds', async () => {
   await run(process.execPath, [CREATE, 'my-ts-app', '--ts'], { cwd: TMP });
   const app = join(TMP, 'my-ts-app');

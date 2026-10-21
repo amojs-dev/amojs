@@ -1,12 +1,10 @@
 import { html } from '@amojs.dev/core';
+import { head } from '../lib/head.js';
 
 export default () => html`<html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${head()}
     <title>my amo app</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/styles/site.css" />
   </head>
   <body>
     <main>

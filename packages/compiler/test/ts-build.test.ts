@@ -105,7 +105,8 @@ test('ssg renders a TypeScript page and never copies .ts as an asset', async () 
 
   const res = await ssgDir(join(TMP, 'proj-ssg/src'), join(TMP, 'dist-ssg'));
 
-  expect(res.pages).toEqual([{ src: join('pages', 'index.js'), out: 'index.html' }]);
+  // reported by the name the author wrote, not the compiled .js
+  expect(res.pages).toEqual([{ src: join('pages', 'index.ts'), out: 'index.html' }]);
   expect(res.assets).toEqual([join('styles', 'site.css')]); // no .ts in the asset list
   const page = await readFile(join(TMP, 'dist-ssg/index.html'), 'utf8');
   expect(page).toContain('<p>hi</p>');

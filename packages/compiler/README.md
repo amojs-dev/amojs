@@ -67,6 +67,11 @@ for (const d of diagnose(source)) {   // one diagnostic per broken template
 }
 ```
 
+`diagnose` finds templates with acorn, which reads JavaScript only. A consumer
+that locates templates by other means — an editor scanning a TypeScript file —
+hands each one to `diagnoseTemplate(source, { strings, quasis })` and gets the
+same verdict from the same parser.
+
 This is a narrow entry point with no filesystem access, so an editor extension
 can bundle it without pulling `build`/`eject` in. It is what
 [`language-tools`](https://github.com/amojs-dev/language-tools) uses — the

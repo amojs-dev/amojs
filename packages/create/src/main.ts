@@ -199,10 +199,12 @@ async function main(argv: string[]): Promise<void> {
       : island
         ? 'src/pages/ renders on node · src/islands/ is the client JS'
         : 'src/pages/ renders on node · zero client JS (add src/islands/ when needed)';
+  // `cd .` is noise: skip the line when the target is the directory we are in
+  const cd = dir === process.cwd() ? '' : `  cd ${dirArg}\n`;
   process.stdout.write(
     `created ${dirArg} (${mode}${mode !== 'csr' && !island ? ', no island' : ''}` +
       `${ts ? ', TypeScript' : ''})\n\n` +
-      `  cd ${dirArg}\n` +
+      cd +
       '  npm install\n' +
       '  npm run dev\n\n' +
       `${shape} ·\n` +

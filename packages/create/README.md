@@ -15,6 +15,7 @@ my-app/
   package.json          dev · build · serve (· check for ts)
   src/
     pages/index.js      rendered on node — ships zero JS of its own
+    lib/head.js         shared by every page (imported as `../lib/head.js`)
     islands/counter.js  the interactive piece — the only client script
     styles/site.css
     public/favicon.svg  files served from the site root

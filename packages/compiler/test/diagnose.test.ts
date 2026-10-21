@@ -5,7 +5,7 @@
  * an off-by-one is invisible in a number and obvious in a slice.
  */
 import { test, expect } from 'vitest';
-import { diagnose } from '../src/diagnose.js';
+import { diagnose, diagnoseTemplate } from '../src/diagnose.js';
 
 /** what a squiggle would actually underline */
 const marked = (src: string) =>
@@ -140,4 +140,31 @@ test('diagnose never throws on a template it cannot understand', () => {
   for (const body of ['<', '</', '<>', '<div', '<div class=', '<!--', '${x}', '']) {
     expect(() => diagnose(`${IMPORT}const el = html\`${body}\`;`)).not.toThrow();
   }
+});
+
+/* ---------------- diagnoseTemplate — the per-template entry ---------------- */
+
+test('diagnoseTemplate judges a template found by other means exactly like diagnose()', () => {
+  // an editor scanning a TypeScript file cannot use acorn, so it locates the
+  // template itself and hands over cooked parts + offsets; the verdict must
+  // be byte-for-byte what diagnose() says on the same template
+  const src = `${IMPORT}const el = html\`<div><p>hi</div>\`;`;
+  const open = src.indexOf('`') + 1;
+  const close = src.lastIndexOf('`');
+  const found = { strings: [src.slice(open, close)], quasis: [{ start: open, end: close }] };
+  expect(diagnoseTemplate(src, found)).toEqual(diagnose(src)[0]);
+  expect(src.slice(diagnoseTemplate(src, found)!.start, diagnoseTemplate(src, found)!.end)).toBe('</div>');
+});
+
+test('diagnoseTemplate returns undefined for a legal template', () => {
+  const src = 'const el = html`<p>${x}</p>`;';
+  const a = src.indexOf('`') + 1;
+  const b = src.lastIndexOf('`');
+  const hole = src.indexOf('${');
+  const holeEnd = src.indexOf('}', hole) + 1;
+  const found = {
+    strings: [src.slice(a, hole), src.slice(holeEnd, b)],
+    quasis: [{ start: a, end: hole }, { start: holeEnd, end: b }],
+  };
+  expect(diagnoseTemplate(src, found)).toBeUndefined();
 });

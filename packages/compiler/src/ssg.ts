@@ -27,7 +27,7 @@
  * the command line.
  */
 
-import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -81,12 +81,13 @@ export async function ssgDir(
 
     for (const file of pageFiles) {
       const rel = relative(join(tmp, pagesDir), file);
+      const srcRel = join(pagesDir, await sourceName(pagesRoot, rel));
       const mod = (await import(/* @vite-ignore */ pathToFileURL(file).href)) as {
         default?: unknown;
       };
       if (typeof mod.default !== 'function') {
         throw new Error(
-          `amo build ssg: ${join(pagesDir, rel)} needs a default export (a component returning a template)`,
+          `amo build ssg: ${srcRel} needs a default export (a component returning a template)`,
         );
       }
       // ONE calling convention for both consumers: a page is `(props) => …`.
@@ -95,14 +96,14 @@ export async function ssgDir(
       const res = (await mod.default({})) as { __amoHtml?: unknown } | null;
       if (!res || typeof res.__amoHtml !== 'string') {
         throw new Error(
-          `amo build ssg: ${join(pagesDir, rel)} did not return a template — a page returns html\`…\``,
+          `amo build ssg: ${srcRel} did not return a template — a page returns html\`…\``,
         );
       }
       const outRel = rel.slice(0, -extname(rel).length) + '.html';
       const dest = join(outDir, outRel);
       await mkdir(dirname(dest), { recursive: true });
       await writeFile(dest, '<!doctype html>\n' + res.__amoHtml + '\n');
-      result.pages.push({ src: join(pagesDir, rel), out: outRel });
+      result.pages.push({ src: srcRel, out: outRel });
     }
 
     async function copyAssets(dir: string): Promise<void> {
@@ -128,4 +129,25 @@ export async function ssgDir(
     await rm(tmp, { recursive: true, force: true });
   }
   return result;
+}
+
+/**
+ * The file the author wrote. The tree is compiled before the pages are walked,
+ * so a `.ts` page shows up as `.js` here — report the name a user would grep for.
+ */
+async function sourceName(pagesRoot: string, compiledRel: string): Promise<string> {
+  const ts = compiledRel.replace(/\.mjs$/, '.mts').replace(/\.js$/, '.ts');
+  if (ts === compiledRel) return compiledRel;
+  try {
+    await access(join(pagesRoot, compiledRel));
+    return compiledRel;
+  } catch {
+    /* no .js source — the compiled module came from a .ts file */
+  }
+  try {
+    await access(join(pagesRoot, ts));
+    return ts;
+  } catch {
+    return compiledRel;
+  }
 }

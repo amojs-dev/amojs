@@ -189,3 +189,25 @@ test('ssgDir: a missing pages directory fails loudly', async () => {
   const src = await writeProject({ 'lib/x.js': 'export const a = 1;\n' });
   await expect(ssgDir(src, join(src, 'out'))).rejects.toThrow(/no pages directory/);
 });
+
+test('ssgDir names a TypeScript page by the file the author wrote', async () => {
+  const src = await writeProject({
+    'pages/index.ts': INTRO_PAGE.replace('export default async () => {', 'export default async (): Promise<unknown> => {'),
+    'pages/about/index.ts': INTRO_PAGE,
+  });
+  const out = join(src, '..', `out-${Math.random().toString(36).slice(2)}`);
+  const r = await ssgDir(src, out);
+  // the tree is compiled (.ts → .js) before the pages are walked; the log and
+  // the result still say .ts, because that is the name a user greps for
+  expect(r.pages).toEqual([
+    { src: join('pages', 'about', 'index.ts'), out: join('about', 'index.html') },
+    { src: join('pages', 'index.ts'), out: 'index.html' },
+  ]);
+  expect(await readFile(join(out, 'about', 'index.html'), 'utf8')).toContain('<p>async data</p>');
+});
+
+test('ssgDir: the loud errors name the .ts source too', async () => {
+  const src = await writeProject({ 'pages/index.ts': "export const notDefault: number = 1;" });
+  const out = join(src, '..', `out-${Math.random().toString(36).slice(2)}`);
+  await expect(ssgDir(src, out)).rejects.toThrow(join('pages', 'index.ts'));
+});

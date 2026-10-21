@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/cli",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS CLI — `amo build` | `dev` | `serve` (csr | ssr | ssg) and `amo eject`. The framework you can uninstall.",

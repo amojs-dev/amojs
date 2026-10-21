@@ -60,35 +60,54 @@ export function diagnose(source: string): Diagnostic[] {
 
   const out: Diagnostic[] = [];
   for (const t of templates) {
-    try {
-      parseTemplate(t.strings);
-    } catch (err) {
-      if (!(err instanceof TemplateError)) throw err; // a real bug, not a template
-      const quasi = t.quasis[err.part];
-      if (!quasi) continue; // defensive: a part index we cannot place
-      const cooked = t.strings[err.part] ?? '';
-      const rawLength = quasi.end - quasi.start;
-
-      if (rawLength !== cooked.length) {
-        // escapes present — offsets do not line up, so widen instead of lying
-        out.push({
-          message: err.detail,
-          start: quasi.start,
-          end: quasi.end,
-          exact: false,
-        });
-        continue;
-      }
-
-      const start = quasi.start + Math.min(err.offset, cooked.length);
-      out.push({
-        message: err.detail,
-        ...span(source, start, quasi, t.quasis[err.part + 1]),
-        exact: true,
-      });
-    }
+    const d = diagnoseTemplate(source, t);
+    if (d) out.push(d);
   }
   return out;
+}
+
+/**
+ * A template located by any means: its cooked parts plus where each one sits
+ * in the source. `detectTemplates` produces this shape; so can an editor that
+ * finds templates lexically in a file acorn cannot read (TypeScript).
+ */
+export interface TemplateSpan {
+  /** the static string parts, COOKED — what the runtime sees as strings[] */
+  strings: string[];
+  /** source offsets of each static part, aligned index-for-index with `strings` */
+  quasis: { start: number; end: number }[];
+}
+
+/**
+ * The one diagnostic of a single template, or undefined when it parses.
+ *
+ * Exported so a consumer that locates templates on its own still gets every
+ * judgement from `parseTemplate` — finding a template is a lexical job, deciding
+ * whether it is legal is not, and only the second half is this package's.
+ */
+export function diagnoseTemplate(source: string, t: TemplateSpan): Diagnostic | undefined {
+  try {
+    parseTemplate(t.strings);
+    return undefined;
+  } catch (err) {
+    if (!(err instanceof TemplateError)) throw err; // a real bug, not a template
+    const quasi = t.quasis[err.part];
+    if (!quasi) return undefined; // defensive: a part index we cannot place
+    const cooked = t.strings[err.part] ?? '';
+    const rawLength = quasi.end - quasi.start;
+
+    if (rawLength !== cooked.length) {
+      // escapes present — offsets do not line up, so widen instead of lying
+      return { message: err.detail, start: quasi.start, end: quasi.end, exact: false };
+    }
+
+    const start = quasi.start + Math.min(err.offset, cooked.length);
+    return {
+      message: err.detail,
+      ...span(source, start, quasi, t.quasis[err.part + 1]),
+      exact: true,
+    };
+  }
 }
 
 /**
