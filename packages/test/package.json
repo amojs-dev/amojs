@@ -1,0 +1,54 @@
+{
+  "name": "@amojs.dev/test",
+  "version": "0.9.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "AmoJS test helpers — render, cleanup, flush, tick for component tests under vitest with a DOM environment. Zero dependencies; never loads the template parser.",
+  "keywords": [
+    "amojs",
+    "testing",
+    "vitest",
+    "happy-dom",
+    "signals",
+    "fine-grained"
+  ],
+  "homepage": "https://amojs.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amojs-dev/amojs.git",
+    "directory": "packages/test"
+  },
+  "bugs": "https://github.com/amojs-dev/amojs/issues",
+  "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
+  "sideEffects": [
+    "./src/index.js"
+  ],
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./pure": {
+      "types": "./types/pure.d.ts",
+      "default": "./src/pure.js"
+    }
+  },
+  "files": [
+    "src",
+    "types"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "@amojs.dev/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@amojs.dev/compiler": "workspace:*",
+    "@amojs.dev/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

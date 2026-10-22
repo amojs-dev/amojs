@@ -42,6 +42,7 @@ mount(Counter, document.getElementById('app'));
 | [`create-amojs`](packages/create) | the scaffold — `npm create amojs my-app`: ssg, ssr or csr · with or without the sample island · JS or TS. | yes |
 | [`@amojs.dev/vite`](packages/vite) | Vite plugin — compiles templates during a normal Vite build, so tree-shaking, splitting and the dev server are Vite's job. | yes |
 | [`@amojs.dev/router`](packages/router) | routing on the Navigation API — pages get *resolved* data, so no page ever renders a loading state. Parser-free; `amo eject` hands it over too. | yes |
+| [`@amojs.dev/test`](packages/test) | component test helpers for vitest with happy-dom or jsdom — `render`, `cleanup`, `flush`, `tick`; `unmount()` disposes every effect, `onCleanup` and `each()` row a component created. Parser-free. | yes |
 | `@amojs.dev/bench` | micro-benchmarks. Competitor libraries are quarantined here so the runtime keeps zero dependencies. | never |
 
 Editor support lives in a separate repository:
