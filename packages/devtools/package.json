@@ -1,0 +1,46 @@
+{
+  "name": "@amojs.dev/devtools",
+  "version": "0.9.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "AmoJS devtools — paints every DOM write on the live page: a flash per write, a glide per move, a panel of counts. Observes the DOM, not the runtime; zero dependencies.",
+  "keywords": [
+    "devtools",
+    "dom",
+    "mutation-observer",
+    "debugging",
+    "fine-grained",
+    "no-build",
+    "vanilla"
+  ],
+  "homepage": "https://amojs.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amojs-dev/amojs.git",
+    "directory": "packages/devtools"
+  },
+  "bugs": "https://github.com/amojs-dev/amojs/issues",
+  "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
+  "sideEffects": false,
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "types"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@amojs.dev/compiler": "workspace:*",
+    "@amojs.dev/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
