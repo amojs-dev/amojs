@@ -28,7 +28,9 @@ Usage:
     csr    compile amo modules for the browser, copy everything else
     ssr    compile with the server target — modules render to strings on
            node; import a page and call it with that request's props
-    ssg    render every page module under <src>/pages/ to static .html
+    ssg    render every page module under <src>/pages/ to static .html;
+           a [param] page (pages/blog/[slug].js) renders once per entry
+           its paths() export returns
 
     browser output is self-contained: core's browser bundle is copied
     to <out>/_amo/ and compiled core imports are rewritten to reach it
@@ -144,7 +146,8 @@ async function runBuild(job: BuildJob): Promise<void> {
     process.stdout.write(
       `amo build ssg — ${r.pages.length} page${r.pages.length === 1 ? '' : 's'} rendered, ` +
         `${r.assets.length} asset${r.assets.length === 1 ? '' : 's'} copied → ${outArg}\n` +
-        r.pages.map((p) => `  ${p.src} → ${p.out}\n`).join(''),
+        r.pages.map((p) => `  ${p.src} → ${p.out}\n`).join('') +
+        r.empty.map((src) => `  ${src} → no pages (paths() returned [])\n`).join(''),
     );
   } else {
     const r = await buildDir(

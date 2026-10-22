@@ -173,6 +173,73 @@ test('amo build ssg: renders pages to static html, islands pass included', async
   expect(css).toBe('p { color: teal }');
 });
 
+test('amo build ssg: a [slug] page expands per paths() entry; amo serve answers the pretty url', async () => {
+  await write(
+    'proj-params/src/pages/blog/[slug]/index.ts',
+    [
+      "import { html } from '@amojs.dev/core';",
+      "export function paths(): { slug: string }[] {",
+      "  return [{ slug: 'world' }, { slug: 'hello' }];",
+      '}',
+      'export default ({ params }: { params: { slug: string } }) =>',
+      '  html`<html lang="en"><head><title>${params.slug}</title></head><body><h1>post ${params.slug}</h1></body></html>`;',
+    ].join('\n'),
+  );
+  await write(
+    'proj-params/src/pages/tags/[tag].js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export const paths = async () => [];',
+      'export default ({ params }) => html`<h1>${params.tag}</h1>`;',
+    ].join('\n'),
+  );
+  await write(
+    'proj-params/src/pages/index.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default (props) => html`<p>home ${JSON.stringify(props)}</p>`;',
+    ].join('\n'),
+  );
+
+  const { stdout } = await run(process.execPath, [
+    AMO, 'build', 'ssg', join(TMP, 'proj-params/src'), join(TMP, 'dist-params'),
+  ]);
+  expect(stdout).toContain('amo build ssg — 3 pages rendered');
+  expect(stdout).toContain(
+    `  ${join('pages', 'blog', '[slug]', 'index.ts')} → ${join('blog', 'hello', 'index.html')}\n` +
+      `  ${join('pages', 'blog', '[slug]', 'index.ts')} → ${join('blog', 'world', 'index.html')}\n` +
+      `  ${join('pages', 'index.js')} → index.html\n`,
+  );
+  expect(stdout).toContain(`  ${join('pages', 'tags', '[tag].js')} → no pages (paths() returned [])`);
+
+  const port = 5880 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'serve', 'ssg', join(TMP, 'dist-params'), '--port', String(port),
+  ]);
+  try {
+    const get = async (path: string) => {
+      for (let i = 0; i < 100; i++) {
+        try {
+          const res = await fetch(`http://localhost:${port}${path}`);
+          return { status: res.status, body: await res.text() };
+        } catch {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      }
+      throw new Error(`serve never answered on :${port}`);
+    };
+
+    const hello = await get('/blog/hello/');
+    expect(hello.status).toBe(200);
+    expect(hello.body).toContain('<h1>post hello</h1>');
+    expect((await get('/blog/world/')).body).toContain('<h1>post world</h1>');
+    expect((await get('/')).body).toContain('<p>home {}</p>');
+    expect((await get('/blog/nope/')).status).toBe(404);
+  } finally {
+    child.kill();
+  }
+}, 30_000);
+
 test('amo build --islands: overrides the islands folder name', async () => {
   await write(
     'proj-isl/src/pages/index.js',

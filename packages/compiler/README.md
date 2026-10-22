@@ -37,7 +37,8 @@ const server = compileModule(source, { target: 'server' });
 // (src/public/** goes to the ROOT of dist, uncompiled)
 await buildDir('src', 'dist');
 
-// render every page module under src/pages/ to static .html on node
+// render every page module under src/pages/ to static .html on node;
+// a [slug] page renders once per entry its `paths()` export returns
 await ssgDir('src', 'dist');
 
 // make a built islands dir self-contained: copy core's browser bundle to

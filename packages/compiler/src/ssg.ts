@@ -25,10 +25,16 @@
  * module rendered per request receives that request's props instead — see
  * `buildDir(src, out, { target: 'server' })`, which is `amo build ssr` on
  * the command line.
+ *
+ * A param page — a path segment that is exactly `[name]`, like
+ * `pages/blog/[slug].ts` — also exports `paths()`, returning one object per
+ * page; each renders with `{ params }` to the path with every `[name]`
+ * replaced: `{ slug: 'hello' }` → `blog/hello.html`. ssg only — the ssr
+ * server maps a url to a file and has no route params.
  */
 
 import { access, copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   buildDir,
@@ -40,13 +46,16 @@ import {
 
 export interface SsgResult {
   /** rendered pages: source module (src-relative) → emitted html (out-relative) */
-  pages: { src: string; out: string }[];
+  pages: { src: string; out: string; params?: Record<string, string> }[];
+  /** param pages whose `paths()` returned [] — rendered nothing (src-relative) */
+  empty: string[];
   /** non-JS files copied verbatim (src-relative) */
   assets: string[];
 }
 
 const JS_EXT = new Set(['.js', '.mjs']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
+const PARAM = /^\[([A-Za-z_][A-Za-z0-9_]*)\]$/;
 
 export async function ssgDir(
   srcDir: string,
@@ -64,7 +73,7 @@ export async function ssgDir(
   // under outDir → under the project → node resolves @amojs.dev/core from
   // the project's own node_modules (or the workspace), exactly like eject
   const tmp = resolve(outDir, `.amo-ssg-${process.pid}-${Date.now().toString(36)}`);
-  const result: SsgResult = { pages: [], assets: [] };
+  const result: SsgResult = { pages: [], empty: [], assets: [] };
   try {
     await buildDir(srcDir, tmp, { target: 'server' });
 
@@ -79,31 +88,67 @@ export async function ssgDir(
     await walk(join(tmp, pagesDir));
     pageFiles.sort(); // deterministic build order and result listing
 
+    const written = new Map<string, string>(); // out-relative html → the page that rendered it
     for (const file of pageFiles) {
       const rel = relative(join(tmp, pagesDir), file);
       const srcRel = join(pagesDir, await sourceName(pagesRoot, rel));
+      const segments = rel.slice(0, -extname(rel).length).split(sep);
+      const names = pageParams(segments, srcRel);
       const mod = (await import(/* @vite-ignore */ pathToFileURL(file).href)) as {
         default?: unknown;
+        paths?: unknown;
       };
       if (typeof mod.default !== 'function') {
         throw new Error(
           `amo build ssg: ${srcRel} needs a default export (a component returning a template)`,
         );
       }
-      // ONE calling convention for both consumers: a page is `(props) => …`.
-      // A build has no request, so ssg passes an empty object — never nothing,
-      // or every page that destructures its props would throw here.
-      const res = (await mod.default({})) as { __amoHtml?: unknown } | null;
-      if (!res || typeof res.__amoHtml !== 'string') {
-        throw new Error(
-          `amo build ssg: ${srcRel} did not return a template — a page returns html\`…\``,
-        );
+
+      let renders: { out: string; params?: Record<string, string> }[];
+      if (names.length === 0) {
+        renders = [{ out: segments.join(sep) + '.html' }];
+      } else {
+        const entries = await expandPaths(mod.paths, names, srcRel);
+        if (entries.length === 0) result.empty.push(srcRel);
+        renders = entries.map((params) => {
+          const filled = segments.map((s) => {
+            const name = PARAM.exec(s)?.[1];
+            return name === undefined ? s : params[name];
+          });
+          return { out: join(...filled) + '.html', params };
+        });
+        renders.sort((a, b) => (a.out < b.out ? -1 : a.out > b.out ? 1 : 0));
       }
-      const outRel = rel.slice(0, -extname(rel).length) + '.html';
-      const dest = join(outDir, outRel);
-      await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, '<!doctype html>\n' + res.__amoHtml + '\n');
-      result.pages.push({ src: srcRel, out: outRel });
+
+      for (const { out } of renders) {
+        const prev = written.get(out);
+        if (prev === srcRel) {
+          throw new Error(
+            `amo build ssg: ${srcRel} renders ${out} twice — two paths() entries give the same page`,
+          );
+        }
+        if (prev !== undefined) {
+          throw new Error(`amo build ssg: ${prev} and ${srcRel} both render ${out}`);
+        }
+        written.set(out, srcRel);
+      }
+
+      for (const { out, params } of renders) {
+        // ONE calling convention for both consumers: a page is `(props) => …`.
+        // A build has no request, so a static page gets an empty object — never
+        // nothing, or every page that destructures its props would throw here.
+        const props = params ? { params } : {};
+        const res = (await mod.default(props)) as { __amoHtml?: unknown } | null;
+        if (!res || typeof res.__amoHtml !== 'string') {
+          throw new Error(
+            `amo build ssg: ${srcRel} did not return a template — a page returns html\`…\``,
+          );
+        }
+        const dest = join(outDir, out);
+        await mkdir(dirname(dest), { recursive: true });
+        await writeFile(dest, '<!doctype html>\n' + res.__amoHtml + '\n');
+        result.pages.push(params ? { src: srcRel, out, params } : { src: srcRel, out });
+      }
     }
 
     async function copyAssets(dir: string): Promise<void> {
@@ -129,6 +174,85 @@ export async function ssgDir(
     await rm(tmp, { recursive: true, force: true });
   }
   return result;
+}
+
+/** the `[name]` params in a page's path, in order — a shape we do not route is a loud error */
+function pageParams(segments: string[], srcRel: string): string[] {
+  const names: string[] = [];
+  for (const seg of segments) {
+    if (!seg.includes('[') && !seg.includes(']')) continue;
+    if (seg.startsWith('[...')) {
+      throw new Error(
+        `amo build ssg: ${srcRel} — catch-all segments like ${seg} are not supported; ` +
+          'a param is one whole path segment: [name]',
+      );
+    }
+    const name = PARAM.exec(seg)?.[1];
+    if (name === undefined) {
+      throw new Error(
+        `amo build ssg: ${srcRel} — "${seg}" is not a param; a param is one whole path ` +
+          'segment, named with letters, digits and _: [slug]',
+      );
+    }
+    if (names.includes(name)) {
+      throw new Error(
+        `amo build ssg: ${srcRel} uses [${name}] twice — each param name appears once in a path`,
+      );
+    }
+    names.push(name);
+  }
+  return names;
+}
+
+/** call a param page's `paths()` and check every entry before anything renders */
+async function expandPaths(
+  paths: unknown,
+  names: string[],
+  srcRel: string,
+): Promise<Record<string, string>[]> {
+  if (typeof paths !== 'function') {
+    throw new Error(
+      `amo build ssg: ${srcRel} needs \`export function paths()\` — one object per page: ` +
+        `[{ ${names.map((n) => `${n}: 'hello'`).join(', ')} }]`,
+    );
+  }
+  const list: unknown = await paths();
+  if (!Array.isArray(list)) {
+    throw new Error(
+      `amo build ssg: ${srcRel} paths() must return an array, one object per page — got ${show(list)}`,
+    );
+  }
+  return list.map((entry: unknown, i) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(
+        `amo build ssg: ${srcRel} paths()[${i}] must be an object of params — got ${show(entry)}`,
+      );
+    }
+    const params: Record<string, string> = {};
+    for (const n of names) {
+      const v = (entry as Record<string, unknown>)[n];
+      if (typeof v !== 'string' || v === '' || v === '.' || /[/\\]|\.\./.test(v)) {
+        throw new Error(
+          `amo build ssg: ${srcRel} paths()[${i}].${n} must name one path segment — a ` +
+            `non-empty string other than ".", with no /, \\ or .. — got ${show(v)}`,
+        );
+      }
+      params[n] = v;
+    }
+    return params;
+  });
+}
+
+function show(v: unknown): string {
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'object' && v !== null) {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      // cyclic or BigInt inside — fall through
+    }
+  }
+  return String(v);
 }
 
 /**

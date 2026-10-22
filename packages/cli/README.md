@@ -98,8 +98,9 @@ request:
 ```
 
 A page receives `{ url }` — a `URL`, so `url.pathname` and `url.searchParams`
-are per-request data. (`amo build ssg` calls the same page with `{}`, so a
-page that uses `url` is an ssr page — that is the whole difference.)
+are per-request data. (`amo build ssg` calls the same page with `{}` — or
+`{ params }` for a param page — so a page that uses `url` is an ssr page;
+that is the whole difference.)
 
 Deliberately dumb, like the compiler: url → file path, no route params, no
 middleware, no config, no compression. **The server you can replace** — when
@@ -183,6 +184,38 @@ import { html } from '@amojs.dev/core';
 export default () => html`<html lang="en"><head><title>hi</title></head>
 <body><h1>${'hello'}</h1></body></html>`;
 ```
+
+A path segment written as `[name]` makes a **param page** — one module, many
+pages. It exports `paths()`, returning one object per page (it may be async —
+fetch the list there), and each object renders with `{ params }` to the path
+with every `[name]` filled in:
+
+```js
+// src/pages/blog/[slug]/index.js
+import { html } from '@amojs.dev/core';
+import { posts } from '../../../lib/posts.js';   // [{ slug, title }, …]
+
+export const paths = () => posts.map((p) => ({ slug: p.slug }));
+
+export default ({ params }) => {
+  const post = posts.find((p) => p.slug === params.slug);
+  return html`<html lang="en"><head><title>${post.title}</title></head>
+<body><h1>${post.title}</h1></body></html>`;
+};
+```
+
+`{ slug: 'hello' }` renders `dist/blog/hello/index.html`, which any static host
+answers at `/blog/hello/`; a `pages/blog/[slug].js` would render
+`dist/blog/hello.html` instead. A param is one whole path segment, so
+`[lang]/docs/[page]` works, while `[...rest]`, `post-[id]` and a name used
+twice are build errors. Every value must be a non-empty string naming one
+segment (no `/`, `\` or `..`), and two entries that would write the same file
+fail the build instead of overwriting each other. `params` holds exactly the
+path's params; a page with no `[name]` in its path still receives `{}`. A
+`paths()` that returns `[]` renders nothing, and the build log says so.
+
+Param pages belong to ssg. `amo serve ssr` maps a url to a file and has no
+route params — a page rendered per request reads what it needs from `url`.
 
 A page with no interactivity ships **zero** script bytes. An interactive
 island is nothing special — a static `<script type="module">` you write in
