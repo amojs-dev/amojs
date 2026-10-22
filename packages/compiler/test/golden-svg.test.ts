@@ -128,3 +128,52 @@ test('a self-closed svg element does not swallow its siblings', async () => {
     expect(svg.querySelector('text').textContent).toBe('hi');
   }
 });
+
+/* ------------------------------------------------------------------ */
+
+const DOT = [
+  "import { signal, html, svg } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
+  'export function Chart() {',
+  '  const r = signal(3);',
+  '  const Dot = () => svg`<circle cx="5" cy="5" r="${r}" onclick="${() => r.value++}"/>`;',
+  '  return html`<svg viewBox="0 0 10 10">${Dot()}<g>${svg`<rect width="${r}" height="2"/>`}</g></svg>`;',
+  '}',
+].join('\n');
+
+async function runDot(src: string) {
+  const mod = await load(src);
+  const el = mod.Chart();
+  document.body.append(el);
+  const c = el.querySelector('circle');
+  const rect = el.querySelector('rect');
+  const snap = () => ({
+    ns: c.namespaceURI,
+    rns: rect.namespaceURI,
+    r: c.getAttribute('r'),
+    w: rect.getAttribute('width'),
+    vb: el.getAttribute('viewBox'),
+  });
+  const s0 = snap();
+  c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  mod.flushSync();
+  return [s0, snap()];
+}
+
+test('GOLDEN svg``: a component rooted at an SVG element lands in the SVG namespace in both modes', async () => {
+  const compiled = compileModule(DOT);
+  expect(compiled).toContain(', 1);'); // the svg flag on the hoisted templates
+  expect(compiled).not.toContain('svg`');
+  const raw = await runDot(DOT);
+  const cmp = await runDot(compiled);
+  expect(cmp).toEqual(raw);
+  expect(raw[0]).toEqual({
+    ns: 'http://www.w3.org/2000/svg',
+    rns: 'http://www.w3.org/2000/svg',
+    r: '3',
+    w: '3',
+    vb: '0 0 10 10',
+  });
+  expect(raw[1].r).toBe('4');
+  expect(raw[1].w).toBe('4');
+});

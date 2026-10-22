@@ -42,9 +42,31 @@ const cache = new WeakMap();
  * @returns {Node}
  */
 export function html(strings, ...values) {
+  return build(strings, values, false);
+}
+
+/**
+ * The same template, parsed in the SVG namespace — for a component whose
+ * ROOT is an SVG element (<g>, <circle>, a chart's keyed row). A template
+ * that merely contains an <svg> needs nothing.
+ * @param {TemplateStringsArray} strings
+ * @param {...unknown} values
+ * @returns {Node}
+ */
+export function svg(strings, ...values) {
+  return build(strings, values, true);
+}
+
+/**
+ * @param {TemplateStringsArray} strings
+ * @param {unknown[]} values
+ * @param {boolean} isSvg
+ * @returns {Node}
+ */
+function build(strings, values, isSvg) {
   let compiled = cache.get(strings);
   if (!compiled) {
-    compiled = compile(strings);
+    compiled = compile(strings, isSvg);
     cache.set(strings, compiled);
   }
 
@@ -77,15 +99,18 @@ export function html(strings, ...values) {
 
 /**
  * @param {TemplateStringsArray} strings
+ * @param {boolean} isSvg
  * @returns {Compiled}
  */
-function compile(strings) {
+function compile(strings, isSvg) {
   const tpl = document.createElement('template');
   let text = strings[0];
   for (let i = 1; i < strings.length; i++) {
     text += M_OPEN + (i - 1) + M_CLOSE + strings[i];
   }
-  tpl.innerHTML = text;
+  // parsed inside an <svg> so the names land in the SVG namespace; the wrapper itself goes
+  tpl.innerHTML = isSvg ? '<svg>' + text + '</svg>' : text;
+  if (isSvg) tpl.content.replaceChildren(.../** @type {Element} */ (tpl.content.firstChild).childNodes);
 
   /** @type {(Binding & { node: Node })[]} */
   const found = [];

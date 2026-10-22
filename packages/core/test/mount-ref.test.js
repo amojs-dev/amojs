@@ -261,3 +261,22 @@ test('onMount work can be torn down with onCleanup through root()', () => {
   dispose();
   expect(disposeLog).toEqual(['mounted']);
 });
+
+test('mount(Component) inside root() is owned by that root — disposing it tears the app down', () => {
+  const s = signal(0);
+  const target = document.createElement('div');
+  let cleaned = 0;
+  const App = () => {
+    onCleanup(() => cleaned++);
+    return html`<p>${s}</p>`;
+  };
+  const before = s.subs.size;
+  const dispose = root((d) => {
+    mount(App, target);
+    return d;
+  });
+  expect(s.subs.size).toBe(before + 1);
+  dispose();
+  expect(s.subs.size).toBe(before); // the hole effect died with the root
+  expect(cleaned).toBe(1);
+});

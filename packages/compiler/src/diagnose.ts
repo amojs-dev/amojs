@@ -72,6 +72,8 @@ export function diagnose(source: string): Diagnostic[] {
  * finds templates lexically in a file acorn cannot read (TypeScript).
  */
 export interface TemplateSpan {
+  /** written with the svg tag (default: html) */
+  svg?: boolean;
   /** the static string parts, COOKED — what the runtime sees as strings[] */
   strings: string[];
   /** source offsets of each static part, aligned index-for-index with `strings` */
@@ -87,7 +89,7 @@ export interface TemplateSpan {
  */
 export function diagnoseTemplate(source: string, t: TemplateSpan): Diagnostic | undefined {
   try {
-    parseTemplate(t.strings);
+    parseTemplate(t.strings, { svg: t.svg === true });
     return undefined;
   } catch (err) {
     if (!(err instanceof TemplateError)) throw err; // a real bug, not a template

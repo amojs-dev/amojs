@@ -20,15 +20,17 @@ export { bindChild, bindAttr, bindEvent } from './bind.js';
  *
  * @param {string} htmlText
  * @param {number[][]} placeholderPaths
+ * @param {number} [svg]  1 for an svg`` template: parsed inside an <svg> wrapper that is then dropped
  * @returns {() => DocumentFragment}
  */
-export function tpl(htmlText, placeholderPaths) {
+export function tpl(htmlText, placeholderPaths, svg) {
   /** @type {DocumentFragment | null} */
   let content = null;
   return () => {
     if (!content) {
       const t = document.createElement('template');
-      t.innerHTML = htmlText;
+      t.innerHTML = svg ? '<svg>' + htmlText + '</svg>' : htmlText;
+      if (svg) t.content.replaceChildren(.../** @type {Element} */ (t.content.firstChild).childNodes);
       for (const path of placeholderPaths) {
         /** @type {Node} */
         let marker = t.content;

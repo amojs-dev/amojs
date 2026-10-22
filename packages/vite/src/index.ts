@@ -14,7 +14,7 @@
  */
 
 import type { Plugin } from 'vite';
-import { compileModule } from '@amojs.dev/compiler';
+import { compile } from '@amojs.dev/compiler';
 
 export interface AmoPluginOptions {
   /**
@@ -49,16 +49,15 @@ export default function amo(options: AmoPluginOptions = {}): Plugin {
       const file = id.split('?')[0]; // drop Vite's query suffixes (?worker, ?raw)
       if (!include.test(file)) return null;
 
-      let out: string;
+      let out: ReturnType<typeof compile>;
       try {
-        out = compileModule(code, { target });
+        out = compile(code, { target, filename: file });
       } catch (err) {
         // name the file: a template error's own message points at the template
         throw new Error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
       }
-      // no sourcemap: the compiler is a source-to-source rewrite without one
-      // yet, and a wrong map is worse than none
-      return out === code ? null : { code: out, map: null };
+      // Vite chains this map with esbuild's own, so a .ts file still maps to its source
+      return out.map ? { code: out.code, map: out.map } : null;
     },
   };
 }

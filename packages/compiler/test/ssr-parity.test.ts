@@ -283,3 +283,13 @@ export default () => html\`<button onclick=\${[5, { once: true }]}>go</button>\`
   expect(rawErr).toBe('amo: onclick needs a function, not a number');
   expect(serverErr).toBe(rawErr);
 });
+
+test('parity: an svg`` template renders its own markup, no wrapper, inside the parent <svg>', async () => {
+  const { html } = await parity(`
+import { html, svg } from '@amojs.dev/core';
+const Dot = (r) => svg\`<circle cx="5" cy="5" r="\${r}"/>\`;
+export default () => html\`<svg viewBox="0 0 10 10">\${Dot(3)}</svg>\`;
+`);
+  expect(html.match(/<svg/g)?.length).toBe(1);
+  expect(html).toMatch(/<circle cx="5" cy="5" r="3"\s*\/>/);
+});

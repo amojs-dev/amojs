@@ -19,9 +19,9 @@
  */
 
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, extname, join, relative } from 'node:path';
+import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import module from 'node:module';
-import { compileModule } from './codegen.js';
+import { compile } from './codegen.js';
 import type { CompileOptions } from './codegen.js';
 
 export interface BuildResult {
@@ -34,6 +34,8 @@ export interface BuildResult {
 export interface BuildOptions extends CompileOptions {
   /** src-relative directory paths to skip entirely (e.g. 'islands') */
   exclude?: string[];
+  /** write a `.map` beside every compiled module (eject turns it off — ejected code is the source now) */
+  sourcemap?: boolean;
 }
 
 /** module extension → emitted extension */
@@ -150,11 +152,21 @@ export async function buildDir(
         const raw = await readFile(src, 'utf8');
         const source = emitExt === ext ? raw : stripTypes(raw, rel);
         let out: string;
+        let map: { toString(): string } | null;
         try {
-          out = compileModule(source, opts);
+          ({ code: out, map } = compile(source, {
+            target: opts.target,
+            // sources[0] is relative to the map's own location, like every bundler writes it
+            filename: relative(dirname(dest), src).split(sep).join('/'),
+            sourcesContent: raw, // the .ts the user wrote, not its stripped twin
+          }));
         } catch (err) {
           // name the file: a template error's own message points at the template
           throw new Error(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        if (map && opts.sourcemap !== false) {
+          await writeFile(dest + '.map', map.toString());
+          out += `\n//# sourceMappingURL=${basename(dest)}.map\n`;
         }
         await writeFile(dest, out);
         (out !== raw ? result.compiled : result.copied).push(outRel);

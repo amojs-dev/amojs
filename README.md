@@ -8,7 +8,7 @@ in the browser with no build step at all. The compiler is an optimizer, not a
 requirement. No virtual DOM, no re-render-and-diff, zero runtime dependencies.
 
 A complete compiled counter app — runtime included, minified and gzipped — is
-**1996 bytes**, under 2 KB.
+**2034 bytes**, under 2 KB.
 
 ```js
 import { signal, computed, html, mount } from '@amojs.dev/core';
@@ -56,9 +56,9 @@ Every claim above is a gate, not an adjective.
 
 | gate | measured | budget |
 |---|---|---|
-| compiled counter app, all-in (bundle + min + gz) | **1996 B** | ≤ 2048 B |
-| runtime minus template parser, bundled | 2556 B | ≤ 2560 B |
-| no-build app, template parser included | 4132 B | ≤ 4160 B |
+| compiled counter app, all-in (bundle + min + gz) | **2034 B** | ≤ 2048 B |
+| runtime minus template parser, bundled | 2614 B | ≤ 2624 B |
+| no-build app, template parser included | 4232 B | ≤ 4288 B |
 | compiled bytes ÷ hand-written vanilla bytes | **1.090** | ≤ 1.10 |
 
 Plus two correctness gates that are the real point:

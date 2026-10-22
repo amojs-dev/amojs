@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/compiler",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS compiler — parse → IR → codegen (DOM and SSR string targets). Runs on node only; never ships to browsers.",
@@ -43,7 +43,8 @@
   ],
   "dependencies": {
     "@amojs.dev/core": "workspace:*",
-    "acorn": "^8.18.0"
+    "acorn": "^8.18.0",
+    "magic-string": "^1.4.3"
   },
   "publishConfig": {
     "access": "public"

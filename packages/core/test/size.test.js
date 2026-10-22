@@ -49,18 +49,19 @@ async function perFileSum(files) {
   return total;
 }
 
-// 4096 → 4160: untrack() and event listener options cost 41 B (measured) at a lid
-// that had zero headroom; the public figure is "about 4 KB"
-test('shape A — a no-build app (raw ESM, parser included) is ≤ 4160 B min+gz', async () => {
+// 4096 → 4288 (2026-10-22): untrack(), event listener options, the self-write guard
+// and the svg`` tag together cost ~115 B at a lid that had zero headroom; the
+// public figure stays "about 4 KB"
+test('shape A — a no-build app (raw ESM, parser included) is ≤ 4288 B min+gz', async () => {
   const bytes = await perFileSum(NO_BUILD);
-  console.log(`[size] shape A, no-build app: ${bytes} B min+gz (budget 4160)`);
-  expect(bytes).toBeLessThanOrEqual(4160);
+  console.log(`[size] shape A, no-build app: ${bytes} B min+gz (budget 4288)`);
+  expect(bytes).toBeLessThanOrEqual(4288);
 });
 
-test('shape B — a compiled app (no parser) is ≤ 3.25KB min+gz', async () => {
+test('shape B — a compiled app (no parser) is ≤ 3392 B min+gz', async () => {
   const bytes = await perFileSum(COMPILED);
-  console.log(`[size] shape B, compiled app: ${bytes} B min+gz (budget 3328)`);
-  expect(bytes).toBeLessThanOrEqual(3328);
+  console.log(`[size] shape B, compiled app: ${bytes} B min+gz (budget 3392)`);
+  expect(bytes).toBeLessThanOrEqual(3392);
 });
 
 /**
@@ -69,7 +70,8 @@ test('shape B — a compiled app (no parser) is ≤ 3.25KB min+gz', async () => 
  * them with the same function `pnpm build` does.
  */
 /** @type {Record<string, number>} */
-const BUNDLE_BUDGET = { 'browser.js': 3456, 'browser-runtime.js': 2560 };
+// 3456/2560 → 3520/2624 (2026-10-22), same reason as shape A above
+const BUNDLE_BUDGET = { 'browser.js': 3520, 'browser-runtime.js': 2624 };
 
 test('the shipped browser bundles are within budget', async () => {
   const bundles = await buildBundles();

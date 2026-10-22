@@ -104,3 +104,32 @@ test('buildDir: a template error names the source file', async () => {
     `${join('pages', 'broken.js')}: amo compiler: unclosed <div>`,
   );
 });
+
+test('buildDir writes a .map beside every compiled module — sources relative to the map, the .ts the user wrote embedded', async () => {
+  const ts = [
+    "import { signal, html } from '@amojs.dev/core';",
+    'const n: number = 1;',
+    'export const el = html`<p>${signal(n)}</p>`;',
+  ].join('\n');
+  await write('proj-map/src/app.ts', ts);
+  await write('proj-map/src/plain.js', 'export const x = 1;'); // no template → no map
+
+  await buildDir(join(TMP, 'proj-map'), join(TMP, 'dist-map'));
+
+  const app = await readFile(join(TMP, 'dist-map/src/app.js'), 'utf8');
+  expect(app.trimEnd().endsWith('//# sourceMappingURL=app.js.map')).toBe(true);
+  const map = JSON.parse(await readFile(join(TMP, 'dist-map/src/app.js.map'), 'utf8'));
+  expect(map.version).toBe(3);
+  expect(map.sources).toEqual(['../../proj-map/src/app.ts']);
+  expect(map.sourcesContent).toEqual([ts]); // the original, types and all
+  expect(map.mappings.length).toBeGreaterThan(0);
+  await expect(readFile(join(TMP, 'dist-map/src/plain.js.map'), 'utf8')).rejects.toThrow();
+  const plain = await readFile(join(TMP, 'dist-map/src/plain.js'), 'utf8');
+  expect(plain).toBe('export const x = 1;');
+
+  // sourcemap: false — what eject passes — writes neither the file nor the comment
+  await buildDir(join(TMP, 'proj-map'), join(TMP, 'dist-nomap'), { sourcemap: false });
+  const bare = await readFile(join(TMP, 'dist-nomap/src/app.js'), 'utf8');
+  expect(bare).not.toContain('sourceMappingURL');
+  await expect(readFile(join(TMP, 'dist-nomap/src/app.js.map'), 'utf8')).rejects.toThrow();
+});

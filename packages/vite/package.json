@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/vite",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "license": "MIT",
   "description": "Vite plugin for AmoJS — compiles html`` templates during a normal Vite build, so bundling, tree-shaking and code-splitting are Vite's job.",

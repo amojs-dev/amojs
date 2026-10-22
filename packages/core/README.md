@@ -9,7 +9,7 @@ bundler, and no configuration. No virtual DOM, no re-render-and-diff, and zero
 runtime dependencies.
 
 A complete compiled counter app — runtime included, minified and gzipped —
-is **1996 bytes**, under 2 KB.
+is **2034 bytes**, under 2 KB.
 
 > **Pre-1.0.** This is published so the name is claimed and tooling can depend
 > on a real version. The core is well tested and the size and correctness gates
@@ -101,9 +101,9 @@ reverse costs n−1, a rotate costs 1).
 
 | gate (enforced in CI) | measured | budget |
 |---|---|---|
-| compiled counter app, all-in (bundle + min + gz) | **1996 B** | ≤ 2048 B |
-| runtime minus template parser, bundled | 2556 B | ≤ 2560 B |
-| no-build app, template parser included | 4132 B | ≤ 4160 B |
+| compiled counter app, all-in (bundle + min + gz) | **2034 B** | ≤ 2048 B |
+| runtime minus template parser, bundled | 2614 B | ≤ 2624 B |
+| no-build app, template parser included | 4232 B | ≤ 4288 B |
 | compiled bytes ÷ hand-written vanilla bytes | **1.090** | ≤ 1.10 |
 
 That last row is the point of the project. Compiled AmoJS output costs under
@@ -141,14 +141,18 @@ the ejected output and asserts there are zero bare-specifier imports left, so
 module resolution never touches `node_modules` again. Delete AmoJS and the app
 keeps working.
 
-## The whole API — 13 names
+## The whole API — 14 names
 
 | | |
 |---|---|
 | **state** | `signal` · `computed` · `effect` · `isSignal` · `untrack` |
-| **template** | `html` · `each` · the reserved `ref` attribute |
+| **template** | `html` · `svg` · `each` · the reserved `ref` attribute |
 | **lifetime** | `mount` · `root` · `onCleanup` · `onMount` |
 | **scheduling** | `flushSync` · `tick` |
+
+`svg```` is `html` for a template whose ROOT is an SVG element — `<g>`, `<circle>`,
+a chart's keyed row — parsed in the SVG namespace. A template that merely
+contains an `<svg>` needs nothing; the browser switches namespace at the tag.
 
 `untrack(fn)` runs `fn` without subscribing to anything it reads — the
 function-shaped twin of a signal's `.peek()`, for reads that go through a
@@ -166,7 +170,7 @@ just a different url in the importmap:
 
 | file | replaces | min+gz |
 |---|---|---|
-| `dist/browser.js` | `@amojs.dev/core` (parser included) | 3.4 KB |
+| `dist/browser.js` | `@amojs.dev/core` (parser included) | 3.5 KB |
 | `dist/browser-runtime.js` | `@amojs.dev/core/runtime` **and** `/compiled` | 2.6 KB |
 
 ```html

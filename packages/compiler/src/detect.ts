@@ -32,6 +32,8 @@ export interface DetectedTemplate {
    * consumer has to notice rather than silently mis-place the range.
    */
   quasis: { start: number; end: number }[];
+  /** written with the `svg` tag — parsed in the SVG namespace */
+  svg: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface DetectedTemplate {
 export function detectTemplates(source: string): DetectedTemplate[] {
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
 
-  const htmlNames = new Set<string>();
+  const tags = new Map<string, boolean>(); // local name → is it the svg tag?
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration') continue;
     if (node.source.value !== '@amojs.dev/core') continue;
@@ -49,19 +51,19 @@ export function detectTemplates(source: string): DetectedTemplate[] {
       if (
         spec.type === 'ImportSpecifier' &&
         spec.imported.type === 'Identifier' &&
-        spec.imported.name === 'html'
+        (spec.imported.name === 'html' || spec.imported.name === 'svg')
       ) {
-        htmlNames.add(spec.local.name);
+        tags.set(spec.local.name, spec.imported.name === 'svg');
       }
     }
   }
-  if (htmlNames.size === 0) return [];
+  if (tags.size === 0) return [];
 
   const found: DetectedTemplate[] = [];
   walk(ast, (node) => {
     if (node.type !== 'TaggedTemplateExpression') return;
     const tag = node.tag as { type: string; name?: string };
-    if (tag.type !== 'Identifier' || !htmlNames.has(tag.name ?? '')) return;
+    if (tag.type !== 'Identifier' || !tags.has(tag.name ?? '')) return;
     const quasi = node.quasi as {
       quasis: { start: number; end: number; value: { cooked?: string; raw: string } }[];
       expressions: { start: number; end: number }[];
@@ -73,6 +75,7 @@ export function detectTemplates(source: string): DetectedTemplate[] {
       strings: quasi.quasis.map((q) => q.value.cooked ?? q.value.raw),
       expressions: quasi.expressions.map((e) => ({ start: e.start, end: e.end })),
       quasis: quasi.quasis.map((q) => ({ start: q.start, end: q.end })),
+      svg: tags.get(tag.name ?? '') === true,
     });
   });
   return found;

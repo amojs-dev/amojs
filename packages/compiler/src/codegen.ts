@@ -16,11 +16,16 @@
  */
 
 import { parse } from 'acorn';
+import MagicString from 'magic-string';
+import type { SourceMap } from 'magic-string';
 import { detectTemplates, walk } from './detect.js';
 import type { AnyNode } from './detect.js';
 import { parseTemplate, TemplateError } from './template.js';
 import type { TemplateIR } from './ir.js';
 import { generateServer, SSR_PREAMBLE } from './codegen-ssr.js';
+
+/** the two template tags core exports — both pull the parser in */
+const PARSER_TAGS = new Set(['html', 'svg']);
 
 export interface CompileOptions {
   /**
@@ -31,12 +36,43 @@ export interface CompileOptions {
    * Server output runs on node; it is a build intermediate, not shipped code.
    */
   target?: 'dom' | 'server';
+  /**
+   * The source map's `sources[0]` — the module's file name as the consumer
+   * wants it spelled (usually relative to where the map will sit).
+   * @default 'module.js'
+   */
+  filename?: string;
+  /**
+   * The text embedded as `sourcesContent`. Pass the original `.ts` when
+   * `source` is its type-stripped twin: node's strip mode keeps every
+   * position, so the map stays exact and DevTools shows the file the user
+   * actually wrote.
+   * @default source
+   */
+  sourcesContent?: string;
 }
 
+export interface CompileResult {
+  code: string;
+  /** a v3 source map; null when the module owned no template and came back untouched */
+  map: SourceMap | null;
+}
+
+/** source in, compiled source out — the compiler as a string function */
 export function compileModule(source: string, opts: CompileOptions = {}): string {
+  return compile(source, opts).code;
+}
+
+/**
+ * `compileModule` with a source map. Every rewrite is an overwrite of the
+ * original range, so untouched code maps exactly and a compiled template maps
+ * to the `html` tag it replaced: coarse inside the generated block, exact
+ * everywhere else, never wrong.
+ */
+export function compile(source: string, opts: CompileOptions = {}): CompileResult {
   const target = opts.target ?? 'dom';
   const templates = detectTemplates(source);
-  if (templates.length === 0) return source;
+  if (templates.length === 0) return { code: source, map: null };
 
   // insertion point for the helper import + hoisted templates:
   // right after the last original import statement
@@ -53,19 +89,14 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
         (s: AnyNode) =>
           s.type === 'ImportSpecifier' &&
           s.imported.type === 'Identifier' &&
-          s.imported.name === 'html',
+          PARSER_TAGS.has(s.imported.name),
       )
     ) {
       coreImport = decl;
     }
   }
 
-  /** completed rewrites, for mapping original offsets into the edited source */
-  const edits: { origEnd: number; delta: number }[] = [];
-  const map = (x: number): number =>
-    x + edits.reduce((acc, e) => acc + (e.origEnd <= x ? e.delta : 0), 0);
-
-  let src = source;
+  const s = new MagicString(source);
   const hoisted: string[] = [];
   let usesChild = false;
   let usesAttr = false;
@@ -77,8 +108,9 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
     .sort((a, b) => b.t.start - a.t.start);
 
   for (const { t, id } of ordered) {
-    const ir = parseTemplate(t.strings);
-    const exprs = t.expressions.map((e) => src.slice(map(e.start), map(e.end)));
+    const ir = parseTemplate(t.strings, { svg: t.svg });
+    // the CURRENT text of each hole — an inner template compiled a moment ago is already in it
+    const exprs = t.expressions.map((e) => s.slice(e.start, e.end));
     let expr: string;
     if (target === 'server') {
       expr = generateServer(ir, exprs, t.strings);
@@ -91,18 +123,14 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
           t.strings[content.expr].length,
         );
       }
-      const g = generate(ir, exprs, id);
+      const g = generate(ir, exprs, id, t.svg);
       hoisted[id] = g.hoisted;
       usesChild ||= g.usesChild;
       usesAttr ||= g.usesAttr;
       usesEvent ||= g.usesEvent;
       expr = g.expr;
     }
-
-    const ms = map(t.start);
-    const me = map(t.end);
-    src = src.slice(0, ms) + expr + src.slice(me);
-    edits.push({ origEnd: t.end, delta: expr.length - (me - ms) });
+    s.overwrite(t.start, t.end, expr);
   }
 
   // strip `html` from the core import when nothing references it anymore —
@@ -112,7 +140,7 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
       (s: AnyNode) =>
         s.type === 'ImportSpecifier' &&
         s.imported.type === 'Identifier' &&
-        s.imported.name === 'html',
+        PARSER_TAGS.has(s.imported.name),
     );
     const exclude = new Set<number>();
     for (const s of htmlSpecs) {
@@ -137,8 +165,8 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
       );
       // parser-free import → the '/runtime' entry: raw ESM has no
       // tree-shaking, and the package root statically pulls html.js in
-      const keepsHtml = keep.some((s: AnyNode) => s.imported.name === 'html');
-      const source = keepsHtml ? '@amojs.dev/core' : '@amojs.dev/core/runtime';
+      const keepsHtml = keep.some((s: AnyNode) => PARSER_TAGS.has(s.imported.name));
+      const from = keepsHtml ? '@amojs.dev/core' : '@amojs.dev/core/runtime';
       const text = keep.length
         ? `import { ${keep
             .map((s) =>
@@ -146,12 +174,10 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
                 ? s.local.name
                 : `${s.imported.name} as ${s.local.name}`,
             )
-            .join(', ')} } from '${source}';`
+            .join(', ')} } from '${from}';`
         : '';
-      const ms = map(coreImport.start);
-      const me = map(coreImport.end);
-      src = src.slice(0, ms) + text + src.slice(me);
-      edits.push({ origEnd: coreImport.end, delta: text.length - (me - ms) });
+      if (text) s.overwrite(coreImport.start, coreImport.end, text);
+      else s.remove(coreImport.start, coreImport.end);
     }
   }
 
@@ -165,22 +191,19 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
     let touchesHtml: boolean;
     if (node.type === 'ImportDeclaration' && decl.source.value === '@amojs.dev/core') {
       touchesHtml = decl.specifiers.some(
-        (s: AnyNode) => s.type !== 'ImportSpecifier' || s.imported.name === 'html',
+        (s: AnyNode) => s.type !== 'ImportSpecifier' || PARSER_TAGS.has(s.imported.name),
       );
     } else if (
       node.type === 'ExportNamedDeclaration' &&
       decl.source &&
       decl.source.value === '@amojs.dev/core'
     ) {
-      touchesHtml = decl.specifiers.some((s: AnyNode) => s.local.name === 'html');
+      touchesHtml = decl.specifiers.some((s: AnyNode) => PARSER_TAGS.has(s.local.name));
     } else {
       continue; // `export * from` would re-export html — left untouched
     }
     if (touchesHtml) continue;
-    const ms = map(decl.source.start);
-    const me = map(decl.source.end);
-    src = src.slice(0, ms) + RUNTIME_SPEC + src.slice(me);
-    edits.push({ origEnd: decl.source.end, delta: RUNTIME_SPEC.length - (me - ms) });
+    s.overwrite(decl.source.start, decl.source.end, RUNTIME_SPEC);
   }
 
   let header: string;
@@ -201,9 +224,15 @@ export function compileModule(source: string, opts: CompileOptions = {}): string
       hoisted.join('\n') +
       '\n';
   }
+  s.appendLeft(importEnd, header);
 
-  const at = map(importEnd);
-  return src.slice(0, at) + header + src.slice(at);
+  const map = s.generateMap({
+    source: opts.filename ?? 'module.js',
+    includeContent: true,
+    hires: 'boundary',
+  });
+  if (opts.sourcesContent !== undefined) map.sourcesContent = [opts.sourcesContent];
+  return { code: s.toString(), map };
 }
 
 interface Generated {
@@ -223,12 +252,12 @@ function accessor(indexes: number[]): string {
     .join('');
 }
 
-function generate(ir: TemplateIR, exprs: string[], id: number): Generated {
+function generate(ir: TemplateIR, exprs: string[], id: number, svg: boolean): Generated {
   const tplVar = `_t${id}`;
   const placeholderPaths = ir.holes
     .filter((h) => h.kind === 'child')
     .map((h) => h.path);
-  const hoisted = `const ${tplVar} = _$t(${JSON.stringify(ir.html)}, ${JSON.stringify(placeholderPaths)});`;
+  const hoisted = `const ${tplVar} = _$t(${JSON.stringify(ir.html)}, ${JSON.stringify(placeholderPaths)}${svg ? ', 1' : ''});`;
 
   // static unwrap decision — mirrors the runtime's unwrap() exactly.
   // when the single root element is all we ever hand out, skip the fragment

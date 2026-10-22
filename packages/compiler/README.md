@@ -28,6 +28,10 @@ import { compileModule, buildDir, ejectDir, ssgDir, vendorCore } from '@amojs.de
 // one module, source in → source out
 const compiled = compileModule(source);
 
+// the same, plus a v3 source map: untouched code maps to its own line, a
+// compiled template to the html tag it replaced — never a wrong position
+const { code, map } = compile(source, { filename: 'app.js' });
+
 // the same templates as string concatenation — the SSR/SSG backend.
 // Same IR, second codegen: static HTML, escaped holes, no markers
 // (islands, never hydration — there is nothing to re-attach)

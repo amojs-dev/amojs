@@ -56,7 +56,9 @@ export class Signal {
     if (Object.is(next, this._v)) return; // cutoff at the source
     this._v = next;
     this.wv = ++writeVersion;
-    for (const r of this.subs) mark(r, DIRTY);
+    // the running reaction itself is skipped: `n.value++` inside an effect
+    // settles with its write instead of re-running forever
+    for (const r of this.subs) if (r !== activeReaction) mark(r, DIRTY);
   }
 
   /**
@@ -513,6 +515,11 @@ export function onDispose(fn) {
   if (!activeOwner) return false;
   (activeOwner.disposals ??= []).push(fn);
   return true;
+}
+
+/** Module-internal (used by mount()): is a scope collecting what is created now? */
+export function owned() {
+  return activeOwner !== null;
 }
 
 /**

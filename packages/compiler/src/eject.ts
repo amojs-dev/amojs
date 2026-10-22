@@ -100,7 +100,7 @@ export async function ejectDir(
 ): Promise<EjectResult> {
   const runtimeDir = options.runtimeDir ?? 'amo-runtime';
   const runtimeFrom = findCoreSrc(srcDir);
-  const built = await buildDir(srcDir, outDir);
+  const built = await buildDir(srcDir, outDir, { sourcemap: false }); // ejected code IS the source now
 
   // 2) hand over the runtime
   const rtOut = join(outDir, runtimeDir);

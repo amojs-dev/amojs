@@ -154,7 +154,7 @@ test('throws: an unquoted hole glued to "/>" — the browser mis-parses it', () 
 });
 
 test('foreign content has no void elements: <svg><circle> still needs closing', () => {
-  expect(() => parseTemplate(['<svg><circle></svg>'])).toThrow(/unexpected <\/svg>/);
+  expect(() => parseTemplate(['<svg><circle></svg>'])).toThrow(/unclosed <circle>/);
   expect(parseTemplate(['<svg><circle></circle></svg>']).html).toBe(
     '<svg><circle></circle></svg>',
   );
@@ -334,4 +334,13 @@ test('throws: hole inside a comment', () => {
 
 test('throws: two holes glued together inside a tag', () => {
   expect(() => parseTemplate(['<div class=', '', '>x</div>'])).toThrow(/two holes/);
+});
+
+test('svg option: foreign-content rules apply from the first character', () => {
+  expect(parseTemplate(['<circle r="', '"/>'], { svg: true }).html).toBe('<circle/>');
+  expect(() => parseTemplate(['<circle/>'])).toThrow(); // in html, a non-void cannot self-close
+  // casing survives, as inside <svg>
+  expect(parseTemplate(['<linearGradient gradientTransform="x"></linearGradient>'], { svg: true }).html).toBe(
+    '<linearGradient gradientTransform="x"></linearGradient>',
+  );
 });

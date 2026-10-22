@@ -104,3 +104,39 @@ test('a template error names the file', () => {
   const bad = "import { html } from '@amojs.dev/core';\nexport const p = html`<div><p>x</div>`;";
   expect(() => transform(amo(), bad, '/app/broken.js')).toThrow(/\/app\/broken\.js: /);
 });
+
+test('the transform returns a source map that names the module', () => {
+  const src = "import { html } from '@amojs.dev/core';\n\nexport const p = html`<p>a</p>`;\nexport const z = 1;";
+  const hook = amo().transform as (c: string, i: string) => { code: string; map: { version: number; sources: string[]; mappings: string } } | null;
+  const out = hook(src, '/app/page.js');
+  expect(out?.map.version).toBe(3);
+  expect(out?.map.sources).toEqual(['/app/page.js']);
+  expect(out?.map.mappings.length).toBeGreaterThan(0);
+});
+
+test('a real vite build with sourcemap: true carries the original source through', async () => {
+  const dir = join(TMP, 'app-map');
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'main.js'), APP);
+  const result = await build({
+    root: dir,
+    logLevel: 'silent',
+    resolve: { alias: ALIAS },
+    plugins: [amo()],
+    build: {
+      write: false,
+      minify: false,
+      sourcemap: true,
+      lib: { entry: join(dir, 'main.js'), formats: ['es'], fileName: 'app' },
+    },
+  });
+  const output = (Array.isArray(result) ? result[0] : result) as unknown as {
+    output: ({ map?: { sources: string[]; sourcesContent?: string[] } } & Record<string, unknown>)[];
+  };
+  const chunk = output.output.find((o) => o.map);
+  expect(chunk).toBeDefined();
+  const map = chunk!.map!;
+  expect(map.sources.some((s) => s.endsWith('main.js'))).toBe(true);
+  // the ORIGINAL main.js text rides along — the html`` template, not the compiled form
+  expect(map.sourcesContent?.some((c) => c.includes('html`<button onclick'))).toBe(true);
+});

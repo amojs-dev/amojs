@@ -15,6 +15,6 @@
 export {
   signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount, untrack,
 } from './signal.js';
-export { html } from './html.js';
+export { html, svg } from './html.js';
 export { mount } from './mount.js';
 export { each } from './each.js';

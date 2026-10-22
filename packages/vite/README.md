@@ -46,16 +46,18 @@ it runs in Vite's normal phase — after Vite's own esbuild transform has stripp
 types. By the time a `.ts` file reaches the compiler it is already JavaScript,
 which is what its acorn parser needs. `enforce: 'pre'` would break that.
 
-**There is no sourcemap yet.** The compiler is a source-to-source rewrite that
-does not emit one, and a wrong map is worse than none, so it returns
-`map: null`. Debugging shows compiled output — readable, but not your file.
+**Source maps are real.** Every compiler rewrite is an overwrite of an original
+range, so the map this plugin hands Vite points untouched code at its own line
+and a compiled template at the `html` tag it replaced — coarse inside the
+generated block, exact everywhere else, never wrong. Vite chains it with
+esbuild's own map, so a `.ts` file still maps to the file you wrote.
 
 ## Size note
 
-A real Vite build of the counter app measures 2311 B gzipped, against 1983 B for
-the same app bundled with esbuild in this repo's size gate. The difference is
-the minifier, not the plugin: Vite 8's default keeps comments, and re-minifying
-its output with esbuild lands at 2036 B.
+A real Vite build of the counter app lands a few hundred bytes above this
+repo's esbuild size gate for the same app. The difference is the minifier, not
+the plugin: Vite's default keeps comments, and re-minifying its output with
+esbuild closes most of the gap.
 
 ## License
 

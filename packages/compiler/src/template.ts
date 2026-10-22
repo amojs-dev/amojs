@@ -105,8 +105,11 @@ export class TemplateError extends Error {
   }
 }
 
-export function parseTemplate(strings: readonly string[]): TemplateIR {
-  return new Parser(strings).parse();
+export function parseTemplate(
+  strings: readonly string[],
+  opts: { svg?: boolean } = {},
+): TemplateIR {
+  return new Parser(strings, opts.svg === true).parse();
 }
 
 class Parser {
@@ -135,7 +138,12 @@ class Parser {
   private rootElementIndex = -1;
   private rootOther = false;
 
-  constructor(private readonly strings: readonly string[]) {}
+  constructor(
+    private readonly strings: readonly string[],
+    svg = false,
+  ) {
+    this.stack[0].foreign = svg; // an svg`` template is foreign content from its first character
+  }
 
   private top(): Frame {
     return this.stack[this.stack.length - 1];
@@ -274,6 +282,13 @@ class Parser {
         if (!m) this.fail('malformed closing tag', p, i);
         const tag = m[1].toLowerCase();
         if (this.stack.length === 1 || this.top().tag !== tag) {
+          // </div> while <p> is still open: the real mistake is the unclosed
+          // <p>, so name it — at its own opening tag
+          const open = this.stack.slice(1).find((f) => f.tag === tag);
+          if (open) {
+            const inner = this.top();
+            this.fail(`unclosed <${inner.tag}>`, inner.origin.part, inner.origin.offset);
+          }
           this.fail(`unexpected </${tag}>`, p, i);
         }
         this.textOpen = false;

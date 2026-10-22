@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { test, expect } from 'vitest';
 import { signal, flushSync } from '../src/signal.js';
-import { html } from '../src/html.js';
+import { html, svg } from '../src/html.js';
 import { mount } from '../src/mount.js';
 
 test('static template returns a real element', () => {
@@ -180,4 +180,23 @@ test('an event hole may carry listener options: [fn, { once: true }]', () => {
   expect(() => html`<button onclick=${[5, { once: true }]}>x</button>`).toThrow(
     /onclick needs a function, not a number/,
   );
+});
+
+test('svg`` parses in the SVG namespace — a component rooted at <circle> works inside an <svg>', () => {
+  const r = signal(5);
+  const Dot = () => svg`<circle cx="10" cy="10" r="${r}"/>`;
+  const el = /** @type {Element} */ (html`<svg viewBox="0 0 20 20">${Dot()}</svg>`);
+  const c = /** @type {Element} */ (el.querySelector('circle'));
+  expect(c.namespaceURI).toBe('http://www.w3.org/2000/svg');
+  expect(c.getAttribute('r')).toBe('5');
+  r.value = 7;
+  flushSync();
+  expect(c.getAttribute('r')).toBe('7');
+  // the html tag would have made an HTML element of the same name — the bug this exists for
+  const wrong = /** @type {Element} */ (html`<circle r="1"></circle>`);
+  expect(wrong.namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+  // several roots: a fragment of SVG nodes
+  const two = /** @type {DocumentFragment} */ (svg`<g></g><g></g>`);
+  expect(two.childNodes.length).toBe(2);
+  expect(/** @type {Element} */ (two.firstChild).namespaceURI).toBe('http://www.w3.org/2000/svg');
 });

@@ -317,6 +317,14 @@ build errors when broken:
 toolchain's job (`tsc --noEmit`) — the build erases types, it does not check
 them.
 
+### Source maps
+
+Every compiled module gets a `.map` beside it, with the file you wrote
+embedded — for `.ts` input that is the TypeScript itself, because node's
+stripper keeps every position. Untouched code maps to its own line; a compiled
+template maps to the `html` tag it replaced. `amo eject` writes none:
+ejected code is the source now.
+
 ## License
 
 MIT © Hamidreza Behzadi

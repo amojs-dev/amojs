@@ -187,3 +187,29 @@ test('untrack: a computed read inside still recomputes, and a throw restores tra
   expect(runs).toBe(2);
   expect(untrack(() => c.value)).toBe(10);
 });
+
+test('an effect writing a signal it also reads settles — it does not re-run itself', () => {
+  const n = signal(0);
+  const other = signal('a');
+  let runs = 0;
+  effect(() => {
+    runs++;
+    other.value;
+    n.value++; // read + write of the same signal inside the reaction
+  });
+  flushSync();
+  expect(runs).toBe(1);
+  expect(n.value).toBe(1);
+  other.value = 'b'; // a real dependency still re-runs it, once
+  flushSync();
+  expect(runs).toBe(2);
+  expect(n.value).toBe(2);
+  // another effect reading n still sees every write
+  let seen = -1;
+  effect(() => {
+    seen = n.value;
+  });
+  other.value = 'c';
+  flushSync();
+  expect(seen).toBe(3);
+});

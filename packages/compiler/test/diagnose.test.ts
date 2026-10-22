@@ -35,13 +35,9 @@ test('a genuinely unclosed element underlines the tag that opened it', () => {
   ]);
 });
 
-test('a wrongly nested close is reported where it appears', () => {
-  // NOTE the parser's own wording: it names the close it did not expect, rather
-  // than the <p> left open. That is compiler behaviour and the compiler is the
-  // authority (LOCKED RULE #3) — diagnose only places the message, it does not
-  // second-guess it. Improving the wording is a compiler change, not this one.
+test('a close that skips an open element names the element left open, at its opening tag', () => {
   expect(marked(`${IMPORT}const el = html\`<div><p>hi</div>\`;`)).toEqual([
-    { message: 'unexpected </div>', text: '</div>', exact: true },
+    { message: 'unclosed <p>', text: '<p>', exact: true },
   ]);
 });
 
@@ -153,7 +149,7 @@ test('diagnoseTemplate judges a template found by other means exactly like diagn
   const close = src.lastIndexOf('`');
   const found = { strings: [src.slice(open, close)], quasis: [{ start: open, end: close }] };
   expect(diagnoseTemplate(src, found)).toEqual(diagnose(src)[0]);
-  expect(src.slice(diagnoseTemplate(src, found)!.start, diagnoseTemplate(src, found)!.end)).toBe('</div>');
+  expect(src.slice(diagnoseTemplate(src, found)!.start, diagnoseTemplate(src, found)!.end)).toBe('<p>');
 });
 
 test('diagnoseTemplate returns undefined for a legal template', () => {
