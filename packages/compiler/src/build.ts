@@ -149,7 +149,13 @@ export async function buildDir(
       if (emitExt) {
         const raw = await readFile(src, 'utf8');
         const source = emitExt === ext ? raw : stripTypes(raw, rel);
-        const out = compileModule(source, opts);
+        let out: string;
+        try {
+          out = compileModule(source, opts);
+        } catch (err) {
+          // name the file: a template error's own message points at the template
+          throw new Error(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
+        }
         await writeFile(dest, out);
         (out !== raw ? result.compiled : result.copied).push(outRel);
       } else {

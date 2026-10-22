@@ -3,8 +3,9 @@
  * and tell the open browser tabs what to do about it (see hmr.ts):
  * css swaps in place, a changed island re-mounts, anything else reloads.
  *
- * A rebuild that fails prints its error and keeps serving the last good
- * build; the server never dies with the code it is serving.
+ * A rebuild that fails prints its error, sends it to the open tabs (an
+ * overlay) and keeps serving the last good build; the server never dies
+ * with the code it is serving.
  *
  * The server itself lives in serve.ts, shared with `amo serve` — dev adds
  * the watcher, the update channel, and, for ssr, a version counter so
@@ -33,7 +34,7 @@ export interface DevOptions {
 /** never resolves — the process is the server until the user stops it */
 export async function runDev(opts: DevOptions): Promise<void> {
   const { srcDir, outDir, port, islandsDir, ssr, build } = opts;
-  const dev: DevChannel = { clients: new Set() };
+  const dev: DevChannel = { clients: new Set(), lastError: null };
   let version = 1;
 
   async function rebuild(): Promise<boolean> {
@@ -41,13 +42,13 @@ export async function runDev(opts: DevOptions): Promise<void> {
       await build();
       await applyDevFacade(outDir); // the build rewrote _amo/ — wrap it again
       version++;
+      dev.lastError = null;
       return true;
     } catch (err) {
-      process.stderr.write(
-        `amo dev: build failed — serving the last good build\n${
-          err instanceof Error ? err.message : String(err)
-        }\n`,
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`amo dev: build failed — serving the last good build\n${message}\n`);
+      dev.lastError = { type: 'error', message };
+      broadcast(dev, dev.lastError);
       return false;
     }
   }
@@ -64,6 +65,10 @@ export async function runDev(opts: DevOptions): Promise<void> {
 
   let pending: NodeJS.Timeout | undefined;
   const changed = new Set<string>();
+  // changes no tab has been told about yet: a failed rebuild carries them
+  // into the next one, so the update after a fix covers everything since
+  const unsent = new Set<string>();
+  let unsentReload = false;
   watch(srcDir, { recursive: true }, (_event, filename) => {
     if (filename) changed.add(filename.toString());
     clearTimeout(pending);
@@ -78,9 +83,13 @@ export async function runDev(opts: DevOptions): Promise<void> {
           !basename(p).startsWith('.') && !p.endsWith('~') && existsSync(join(srcDir, p)),
       );
       changed.clear();
+      for (const p of batch) unsent.add(p);
+      if (batch.length === 0) unsentReload = true;
       process.stdout.write('\nrebuilding…\n');
       if (await rebuild()) {
-        const update = classify(batch, { islandsDir, v: version });
+        const update = classify(unsentReload ? [] : unsent, { islandsDir, v: version });
+        unsent.clear();
+        unsentReload = false;
         broadcast(dev, update);
         process.stdout.write(
           update.type === 'css'

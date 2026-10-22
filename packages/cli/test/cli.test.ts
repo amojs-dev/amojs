@@ -10,6 +10,10 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
 import { execFile, spawn } from 'node:child_process';
 import { classify } from '../src/hmr.js';
+import type { DevChannel, Update } from '../src/hmr.js';
+import { startServer } from '../src/serve.js';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
 import { promisify } from 'node:util';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -559,6 +563,180 @@ test('amo dev: injects the dev client and answers the SSE endpoint; build output
     const first = new TextDecoder().decode((await reader.read()).value);
     expect(first).toContain(':connected');
     await reader.cancel();
+  } finally {
+    child.kill();
+  }
+}, 30_000);
+
+/** read SSE `data:` messages off an open /_amo/events response, skipping comment frames */
+function messages(res: Response) {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  return {
+    async next(): Promise<Update> {
+      for (;;) {
+        const at = buf.indexOf('\n\n');
+        if (at !== -1) {
+          const data = buf.slice(0, at).split('\n').find((l) => l.startsWith('data: '));
+          buf = buf.slice(at + 2);
+          if (data) return JSON.parse(data.slice('data: '.length)) as Update;
+          continue;
+        }
+        const { value, done } = await reader.read();
+        if (done) throw new Error('event stream closed');
+        buf += decoder.decode(value, { stream: true });
+      }
+    },
+    /** the first message that is not an error — a build can fail more than once per save */
+    async afterErrors(): Promise<Update> {
+      for (;;) {
+        const m = await this.next();
+        if (m.type !== 'error') return m;
+      }
+    },
+    cancel: () => reader.cancel(),
+  };
+}
+
+/** retry while the server is still starting */
+async function connect(url: string): Promise<Response> {
+  for (let i = 0; i < 100; i++) {
+    try {
+      return await fetch(url);
+    } catch {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+  throw new Error(`nothing answered ${url}`);
+}
+
+test('dev server: a standing build error is the first frame, and pages fall back to the overlay', async () => {
+  const out = join(TMP, 'empty-out');
+  await mkdir(out, { recursive: true });
+  const dev: DevChannel = { clients: new Set(), lastError: { type: 'error', message: 'boom' } };
+  const devServer = startServer({ outDir: out, port: 0, dev });
+  const plain = startServer({ outDir: out, port: 0 }); // amo serve: no channel
+  try {
+    await Promise.all([once(devServer, 'listening'), once(plain, 'listening')]);
+    const at = (s: typeof devServer, path: string) =>
+      `http://localhost:${(s.address() as AddressInfo).port}${path}`;
+
+    const stream = messages(await fetch(at(devServer, '/_amo/events')));
+    expect(await stream.next()).toEqual({ type: 'error', message: 'boom' });
+    await stream.cancel();
+
+    // nothing built for this url: the bare document carries the client
+    for (const path of ['/', '/docs/', '/about', '/x.html']) {
+      const res = await fetch(at(devServer, path));
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('<title>amo dev</title>');
+      expect(body).toContain('/_amo/dev.js');
+    }
+    expect((await fetch(at(devServer, '/site.css'))).status).toBe(404); // assets never fall back
+
+    // no standing error → a missing page is a plain 404 again
+    dev.lastError = null;
+    expect((await fetch(at(devServer, '/'))).status).toBe(404);
+
+    // amo serve never falls back
+    expect((await fetch(at(plain, '/'))).status).toBe(404);
+  } finally {
+    for (const s of [devServer, plain]) {
+      s.closeAllConnections();
+      s.close();
+    }
+  }
+});
+
+const PAGE = (body: string) =>
+  [
+    "import { html } from '@amojs.dev/core';",
+    `export default () => html\`<html lang="en"><head><title>t</title></head><body>${body}</body></html>\`;`,
+  ].join('\n');
+
+test('amo dev: a failed rebuild reaches the tab as an error frame; the fix reloads', async () => {
+  await write('proj-err/src/pages/index.js', PAGE('<p>ok</p>'));
+
+  const port = 5880 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'dev', 'ssg', join(TMP, 'proj-err/src'), join(TMP, 'dist-err'), '--port', String(port),
+  ]);
+  const stream = messages(await connect(`http://localhost:${port}/_amo/events`));
+  try {
+    await write('proj-err/src/pages/index.js', PAGE('<div><p>broken</p>'));
+    const err = await stream.next();
+    expect(err.type).toBe('error');
+    expect(err.type === 'error' && err.message).toContain(join('pages', 'index.js'));
+    expect(err.type === 'error' && err.message).toContain('amo compiler: ');
+
+    // a tab opened now is told why at once
+    const late = messages(await fetch(`http://localhost:${port}/_amo/events`));
+    expect((await late.next()).type).toBe('error');
+    await late.cancel();
+
+    await write('proj-err/src/pages/index.js', PAGE('<p>fixed</p>'));
+    expect(await stream.afterErrors()).toEqual({ type: 'reload' });
+    expect(await (await fetch(`http://localhost:${port}/`)).text()).toContain('<p>fixed</p>');
+  } finally {
+    await stream.cancel();
+    child.kill();
+  }
+}, 30_000);
+
+const ISLAND = (label: string) =>
+  [
+    "import { html, mount } from '@amojs.dev/core';",
+    `mount(() => html\`<b>${label}</b>\`, document.body);`,
+  ].join('\n');
+
+test('amo dev: the update after a fix covers every change made while the build was failing', async () => {
+  await write('proj-carry/src/pages/index.js', PAGE('<p>one</p>'));
+  await write('proj-carry/src/islands/counter.js', ISLAND('a'));
+
+  const port = 6090 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'dev', 'ssg', join(TMP, 'proj-carry/src'), join(TMP, 'dist-carry'), '--port', String(port),
+  ]);
+  const stream = messages(await connect(`http://localhost:${port}/_amo/events`));
+  try {
+    await write('proj-carry/src/islands/counter.js', ISLAND('<i>broken'));
+    expect((await stream.next()).type).toBe('error');
+
+    // a page edit while the island is broken: this build fails too
+    await write('proj-carry/src/pages/index.js', PAGE('<p>two</p>'));
+    expect((await stream.next()).type).toBe('error');
+
+    // fixing only the island would hot-swap it — but the page changed too
+    await write('proj-carry/src/islands/counter.js', ISLAND('b'));
+    expect(await stream.afterErrors()).toEqual({ type: 'reload' });
+
+    // carried changes are spent: a lone island edit is hot again
+    await write('proj-carry/src/islands/counter.js', ISLAND('c'));
+    expect(await stream.next()).toMatchObject({ type: 'island', paths: ['/islands/counter.js'] });
+  } finally {
+    await stream.cancel();
+    child.kill();
+  }
+}, 30_000);
+
+test('amo dev: when the first build fails, a page url still opens the overlay', async () => {
+  await write('proj-first/src/pages/index.js', PAGE('<div><p>broken from the start</p>'));
+
+  const port = 6300 + Math.floor(Math.random() * 200);
+  const child = spawn(process.execPath, [
+    AMO, 'dev', 'ssg', join(TMP, 'proj-first/src'), join(TMP, 'dist-first'), '--port', String(port),
+  ]);
+  try {
+    const res = await connect(`http://localhost:${port}/`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('/_amo/dev.js');
+
+    const stream = messages(await fetch(`http://localhost:${port}/_amo/events`));
+    const err = await stream.next();
+    expect(err.type === 'error' && err.message).toContain(join('pages', 'index.js'));
+    await stream.cancel();
   } finally {
     child.kill();
   }

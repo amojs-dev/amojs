@@ -61,8 +61,7 @@ url must be exact.
 ### `amo dev`
 
 The dev loop: one build, then watch `<src>`, rebuild on change, and serve
-`<out>` with pretty urls (`/docs/` answers from `docs/index.html`). A rebuild
-that fails prints its error and keeps serving the last good build.
+`<out>` with pretty urls (`/docs/` answers from `docs/index.html`).
 
 Open tabs update themselves, each change taking the cheapest honest path:
 
@@ -73,6 +72,13 @@ Open tabs update themselves, each change taking the cheapest honest path:
   said plainly rather than pretended away.
 - **anything else** (pages, lib, public) — the page is server-rendered HTML,
   so there is no client module to swap: the browser reloads itself.
+
+A rebuild that fails prints its error, keeps serving the last good build, and
+shows the same message in every open tab, in an overlay that closes itself
+when the next build succeeds (Esc or a click outside it hides it sooner). The
+update after the fix covers everything saved while the build was failing.
+When the very first build fails, a page url answers with a bare document
+carrying the overlay — the reason on screen, not a 404.
 
 The channel is one SSE endpoint and a small client injected into served
 HTML — never into the build: `dist/` and `amo serve` output stay

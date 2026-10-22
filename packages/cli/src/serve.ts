@@ -20,7 +20,7 @@ import { createServer } from 'node:http';
 import type { Server, ServerResponse } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { DEV_CLIENT } from './hmr.js';
+import { DEV_CLIENT, frame } from './hmr.js';
 import type { DevChannel } from './hmr.js';
 
 const TYPES: Record<string, string> = {
@@ -61,8 +61,10 @@ export interface ServeOptions {
   cacheControl?: string;
   /**
    * dev only: expose /_amo/events (SSE) + /_amo/dev.js and inject the dev
-   * client into every html response. `amo serve` never passes this — built
-   * output and served bytes stay identical to production.
+   * client into every html response; while a build is failing, a page url
+   * with nothing to serve answers with a bare document carrying the client.
+   * `amo serve` never passes this — built output and served bytes stay
+   * identical to production.
    */
   dev?: DevChannel;
 }
@@ -73,6 +75,10 @@ function withDevClient(html: string): string {
   const at = html.lastIndexOf('</body>');
   return at === -1 ? html + tag : html.slice(0, at) + tag + html.slice(at);
 }
+
+/** dev only: what a page url answers when the build that would make it failed */
+const DEV_FALLBACK =
+  '<!doctype html><title>amo dev</title><script type="module" src="/_amo/dev.js?fallback"></script>\n';
 
 /** decoded, normalized, query-stripped, traversal-stripped url path */
 function cleanPath(urlPath: string): string {
@@ -140,6 +146,7 @@ export function startServer(o: ServeOptions): Server {
           connection: 'keep-alive',
         });
         res.write(':connected\n\n');
+        if (o.dev.lastError) res.write(frame(o.dev.lastError));
         o.dev.clients.add(res);
         req.on('close', () => o.dev?.clients.delete(res));
         return;
@@ -186,6 +193,12 @@ export function startServer(o: ServeOptions): Server {
         }
         return;
       }
+    }
+
+    if (o.dev?.lastError && ['', '.html'].includes(extname(clean))) {
+      head(res, 200, TYPES['.html'], o);
+      res.end(DEV_FALLBACK);
+      return;
     }
 
     head(res, 404, 'text/plain; charset=utf-8', o);

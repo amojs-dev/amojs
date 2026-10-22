@@ -90,3 +90,17 @@ test('buildDir exclude skips a src-relative directory entirely', async () => {
   expect(rels).toContain(join('deep', 'islands', 'nested.js')); // only the root islands/ is excluded
   await expect(readFile(join(TMP, 'dist-ex/islands/counter.js'), 'utf8')).rejects.toThrow();
 });
+
+test('buildDir: a template error names the source file', async () => {
+  await write(
+    'proj-bad/pages/broken.js',
+    [
+      "import { html } from '@amojs.dev/core';",
+      'export default () => html`<div><p>x</p>`;',
+    ].join('\n'),
+  );
+
+  await expect(buildDir(join(TMP, 'proj-bad'), join(TMP, 'dist-bad'))).rejects.toThrow(
+    `${join('pages', 'broken.js')}: amo compiler: unclosed <div>`,
+  );
+});
