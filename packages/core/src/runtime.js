@@ -8,7 +8,7 @@
  */
 
 export {
-  signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount,
+  signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount, untrack,
 } from './signal.js';
 export { mount } from './mount.js';
 export { each } from './each.js';

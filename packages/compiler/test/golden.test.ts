@@ -232,3 +232,34 @@ test('GOLDEN textarea: static default + value binding, identical in both modes',
   expect(raw.value).toBe('edited');
   expect(raw.def).toBe('fallback'); // the DEFAULT never tracks — value does
 });
+
+/* ------------------------------------------------------------------ */
+
+const ONCE = [
+  "import { signal, html } from '@amojs.dev/core';",
+  "export { flushSync } from '@amojs.dev/core';",
+  'export function Once() {',
+  '  const n = signal(0);',
+  '  return html`<button onclick=${[() => n.value++, { once: true }]}>n:${n}</button>`;',
+  '}',
+].join('\n');
+
+async function runOnce(src: string) {
+  const mod = await load(src);
+  const el = mod.Once();
+  document.body.append(el);
+  el.click();
+  el.click();
+  el.click();
+  mod.flushSync();
+  return el.textContent;
+}
+
+test('GOLDEN event options: [listener, { once }] fires once in both modes', async () => {
+  const compiled = compileModule(ONCE);
+  expect(compiled).toContain('_$event(');
+  const raw = await runOnce(ONCE);
+  const cmp = await runOnce(compiled);
+  expect(cmp).toBe(raw);
+  expect(raw).toBe('n:1');
+});

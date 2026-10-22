@@ -100,7 +100,8 @@ function toNodes(v) {
 }
 
 /**
- * Attach an `on*` hole's listener.
+ * Attach an `on*` hole's listener — the function itself, or
+ * `[fn, options]` for addEventListener's `passive` / `capture` / `once`.
  *
  * A listener must be a FUNCTION. Every other hole position accepts a signal,
  * so handing one to `onclick=${…}` is the natural mistake — and passing a
@@ -112,10 +113,12 @@ function toNodes(v) {
  * @param {*} v
  */
 export function bindEvent(el, name, v) {
+  let opts;
+  if (Array.isArray(v)) [v, opts] = v;
   if (typeof v !== 'function') {
     throw new Error(`amo: on${name} needs a function, not a ${isSignal(v) ? 'signal' : typeof v}`);
   }
-  el.addEventListener(name, v);
+  el.addEventListener(name, v, opts);
 }
 
 /**

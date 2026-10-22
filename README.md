@@ -8,7 +8,7 @@ in the browser with no build step at all. The compiler is an optimizer, not a
 requirement. No virtual DOM, no re-render-and-diff, zero runtime dependencies.
 
 A complete compiled counter app — runtime included, minified and gzipped — is
-**1.98 KB**.
+**1996 bytes**, under 2 KB.
 
 ```js
 import { signal, computed, html, mount } from '@amojs.dev/core';
@@ -28,9 +28,9 @@ mount(Counter, document.getElementById('app'));
 ```
 
 > **Pre-1.0.** Published so the name is claimed and tooling can depend on a real
-> version. There is no SSR and no documentation site yet — see
+> version. Documentation: [amojs.dev](https://amojs.dev). See
 > [packages/core/README.md](packages/core/README.md#status--what-is-not-here)
-> for the full list of what is missing.
+> for the list of what is deliberately not here.
 
 ## Packages
 
@@ -56,10 +56,10 @@ Every claim above is a gate, not an adjective.
 
 | gate | measured | budget |
 |---|---|---|
-| compiled counter app, all-in (bundle + min + gz) | **1982 B** | ≤ 2048 B |
-| runtime minus template parser, bundled | 2520 B | ≤ 2560 B |
-| no-build app, template parser included | 4020 B | ≤ 4096 B |
-| compiled bytes ÷ hand-written vanilla bytes | **1.087** | ≤ 1.10 |
+| compiled counter app, all-in (bundle + min + gz) | **1996 B** | ≤ 2048 B |
+| runtime minus template parser, bundled | 2556 B | ≤ 2560 B |
+| no-build app, template parser included | 4132 B | ≤ 4160 B |
+| compiled bytes ÷ hand-written vanilla bytes | **1.090** | ≤ 1.10 |
 
 Plus two correctness gates that are the real point:
 

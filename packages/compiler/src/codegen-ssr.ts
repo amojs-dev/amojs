@@ -78,6 +78,7 @@ const _$b = (n, v) => (_$u(v) ? ' ' + n + '=""' : '');
 const _$v = (v) => ' value="' + _$ea(_$txt(_$u(v))) + '"';
 const _$ta = (v) => _$et(_$txt(_$u(v)));
 const _$e = (n, v) => {
+  if (Array.isArray(v)) v = v[0]; // [listener, options]
   if (typeof v !== 'function')
     throw new Error(
       'amo: on' + n + ' needs a function, not a ' + (_$is(v) ? 'signal' : typeof v),

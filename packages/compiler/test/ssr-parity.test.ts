@@ -254,3 +254,32 @@ export default () => html\`<input class="focus-me" ref=\${el}>\`;
 `);
   expect(html).not.toContain('ref');
 });
+
+test('parity: event options emit nothing, and a bad listener inside the array throws the same words', async () => {
+  const { html } = await parity(`
+import { html } from '@amojs.dev/core';
+export default () => html\`<div onscroll=\${[() => {}, { passive: true }]}>go</div>\`;
+`);
+  expect(html).not.toContain('onscroll');
+
+  const bad = `
+import { html } from '@amojs.dev/core';
+export default () => html\`<button onclick=\${[5, { once: true }]}>go</button>\`;
+`;
+  const rawMod = await load(bad);
+  const serverMod = await load(compileModule(bad, { target: 'server' }));
+  let rawErr = '';
+  let serverErr = '';
+  try {
+    rawMod.default();
+  } catch (e) {
+    rawErr = (e as Error).message;
+  }
+  try {
+    serverMod.default();
+  } catch (e) {
+    serverErr = (e as Error).message;
+  }
+  expect(rawErr).toBe('amo: onclick needs a function, not a number');
+  expect(serverErr).toBe(rawErr);
+});

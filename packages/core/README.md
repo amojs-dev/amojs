@@ -9,12 +9,12 @@ bundler, and no configuration. No virtual DOM, no re-render-and-diff, and zero
 runtime dependencies.
 
 A complete compiled counter app — runtime included, minified and gzipped —
-is **1.98 KB**.
+is **1996 bytes**, under 2 KB.
 
 > **Pre-1.0.** This is published so the name is claimed and tooling can depend
 > on a real version. The core is well tested and the size and correctness gates
-> below run in CI, but there is no documentation site yet. Read
-> [Status](#status--what-is-not-here) before adopting it. The API may still
+> below run in CI; the documentation lives at [amojs.dev](https://amojs.dev).
+> Read [Status](#status--what-is-not-here) before adopting it. The API may still
 > change.
 
 ---
@@ -76,6 +76,14 @@ Each hole gets its own tiny effect. When one signal changes, exactly one
 expression re-evaluates and exactly one DOM node is touched. Nothing is
 compared, because nothing needs to be.
 
+An `on*` attribute takes the listener itself, or `[listener, options]` when
+you need `addEventListener`'s `passive`, `capture` or `once`:
+
+```js
+html`<button onclick=${save}>Save</button>`
+html`<div onscroll=${[onScroll, { passive: true }]}>…</div>`
+```
+
 ### Lists
 
 ```js
@@ -93,10 +101,10 @@ reverse costs n−1, a rotate costs 1).
 
 | gate (enforced in CI) | measured | budget |
 |---|---|---|
-| compiled counter app, all-in (bundle + min + gz) | **1982 B** | ≤ 2048 B |
-| runtime minus template parser, bundled | 2520 B | ≤ 2560 B |
-| no-build app, template parser included | 4020 B | ≤ 4096 B |
-| compiled bytes ÷ hand-written vanilla bytes | **1.087** | ≤ 1.10 |
+| compiled counter app, all-in (bundle + min + gz) | **1996 B** | ≤ 2048 B |
+| runtime minus template parser, bundled | 2556 B | ≤ 2560 B |
+| no-build app, template parser included | 4132 B | ≤ 4160 B |
+| compiled bytes ÷ hand-written vanilla bytes | **1.090** | ≤ 1.10 |
 
 That last row is the point of the project. Compiled AmoJS output costs under
 10% more than the vanilla DOM code a person would have written by hand — and
@@ -133,14 +141,18 @@ the ejected output and asserts there are zero bare-specifier imports left, so
 module resolution never touches `node_modules` again. Delete AmoJS and the app
 keeps working.
 
-## The whole API — 12 names
+## The whole API — 13 names
 
 | | |
 |---|---|
-| **state** | `signal` · `computed` · `effect` · `isSignal` |
+| **state** | `signal` · `computed` · `effect` · `isSignal` · `untrack` |
 | **template** | `html` · `each` · the reserved `ref` attribute |
 | **lifetime** | `mount` · `root` · `onCleanup` · `onMount` |
 | **scheduling** | `flushSync` · `tick` |
+
+`untrack(fn)` runs `fn` without subscribing to anything it reads — the
+function-shaped twin of a signal's `.peek()`, for reads that go through a
+helper or a computed.
 
 Subpath entries for compiled and ejected output, which never load the template
 parser: `@amojs.dev/core/runtime` and `@amojs.dev/core/compiled`.
@@ -154,8 +166,8 @@ just a different url in the importmap:
 
 | file | replaces | min+gz |
 |---|---|---|
-| `dist/browser.js` | `@amojs.dev/core` (parser included) | 3.3 KB |
-| `dist/browser-runtime.js` | `@amojs.dev/core/runtime` **and** `/compiled` | 2.5 KB |
+| `dist/browser.js` | `@amojs.dev/core` (parser included) | 3.4 KB |
+| `dist/browser-runtime.js` | `@amojs.dev/core/runtime` **and** `/compiled` | 2.6 KB |
 
 ```html
 <script type="importmap">
@@ -189,8 +201,6 @@ Stated plainly, because finding out later is worse:
   templates (`amo build ssr` does it per request) — static islands, never
   hydration, so a page with no island ships zero script bytes. Nothing in
   this package runs on the server.
-- **No documentation site yet.** [amojs.dev](https://amojs.dev) is currently a
-  landing page.
 - **No deep reactivity, deliberately.** There is no Proxy layer. Replace the
   array (`items.value = [...items.value, x]`) or put a signal inside each item.
   Magic mutation cannot be ejected as "code you would have written", which is
@@ -200,8 +210,8 @@ Stated plainly, because finding out later is worse:
   carry static content only, so a `<textarea>` binds through
   `value="${x}"` rather than through its children; and an attribute hole must
   be the entire attribute value — `class="${x}"`, not `class="a ${x}"`.
-- **No global event delegation.** Listeners are attached per element, exactly
-  as in vanilla.
+- **No global event delegation.** Listeners are attached per element with
+  `addEventListener`, exactly as in vanilla.
 
 Things it is measured against, honestly: on pure reactive-graph micro-benchmarks
 the signal core sits roughly 6× behind `alien-signals`, which is invisible

@@ -169,3 +169,15 @@ test('svg <title> is ordinary markup — a hole inside it binds', () => {
   mount(el, document.body);
   expect(/** @type {Element} */ (el.querySelector('title')).textContent).toBe('chart');
 });
+
+test('an event hole may carry listener options: [fn, { once: true }]', () => {
+  let n = 0;
+  const el = /** @type {HTMLButtonElement} */ (html`<button onclick=${[() => n++, { once: true }]}>x</button>`);
+  el.click();
+  el.click();
+  expect(n).toBe(1);
+  // a non-function inside the array is the same mistake, same words
+  expect(() => html`<button onclick=${[5, { once: true }]}>x</button>`).toThrow(
+    /onclick needs a function, not a number/,
+  );
+});

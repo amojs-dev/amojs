@@ -447,6 +447,23 @@ export function effect(fn) {
 }
 
 /**
+ * Run `fn` without subscribing to anything it reads — the function-shaped
+ * twin of `.peek()`, for reads that go through helpers or computeds.
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export function untrack(fn) {
+  const prev = activeReaction;
+  activeReaction = null;
+  try {
+    return fn();
+  } finally {
+    activeReaction = prev;
+  }
+}
+
+/**
  * Run `fn` inside a fresh, DETACHED ownership scope: children don't attach
  * to the current owner (reorders/re-runs above can't kill them) and reads
  * don't subscribe. `fn` receives the scope's dispose function; its return
@@ -459,18 +476,18 @@ export function effect(fn) {
 export function root(fn) {
   const r = new Root();
   const prevOwner = activeOwner;
-  const prevReaction = activeReaction;
   activeOwner = r;
-  activeReaction = null; // reads inside a root are deliberate non-subscriptions
   try {
-    return fn(() => {
-      r.disposed = true;
-      teardown(r);
-      drain(r, 'disposals');
-    });
+    // reads inside a root are deliberate non-subscriptions
+    return untrack(() =>
+      fn(() => {
+        r.disposed = true;
+        teardown(r);
+        drain(r, 'disposals');
+      }),
+    );
   } finally {
     activeOwner = prevOwner;
-    activeReaction = prevReaction;
   }
 }
 

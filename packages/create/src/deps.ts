@@ -7,7 +7,7 @@
  * the bin.
  */
 export const TEMPLATE_DEPS = {
-  '@amojs.dev/core': '^0.8.1',
-  '@amojs.dev/cli': '^0.13.1',
+  '@amojs.dev/core': '^0.9.0',
+  '@amojs.dev/cli': '^0.13.2',
   typescript: '^7.0.0', // --ts only; verified against the template tsconfig
 } as const;

@@ -13,7 +13,7 @@
  */
 
 export {
-  signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount,
+  signal, computed, effect, isSignal, flushSync, tick, root, onCleanup, onMount, untrack,
 } from './signal.js';
 export { html } from './html.js';
 export { mount } from './mount.js';

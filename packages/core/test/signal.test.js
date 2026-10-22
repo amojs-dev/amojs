@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { signal, computed, effect, flushSync } from '../src/signal.js';
+import { signal, computed, effect, flushSync, untrack } from '../src/signal.js';
 
 test('signal: read / write / peek', () => {
   const s = signal(1);
@@ -144,4 +144,46 @@ test('dispose stops future runs', () => {
   s.value = 1;
   flushSync();
   expect(runs).toBe(1);
+});
+
+test('untrack: reads inside do not subscribe; tracking resumes after it', () => {
+  const a = signal(1);
+  const b = signal(10);
+  let runs = 0;
+  let seen = 0;
+  effect(() => {
+    runs++;
+    seen = untrack(() => a.value) + b.value;
+  });
+  expect(runs).toBe(1);
+  expect(seen).toBe(11);
+  a.value = 2;
+  flushSync();
+  expect(runs).toBe(1); // a was read untracked
+  b.value = 20;
+  flushSync();
+  expect(runs).toBe(2); // b still tracked — and the re-run sees a's current value
+  expect(seen).toBe(22);
+});
+
+test('untrack: a computed read inside still recomputes, and a throw restores tracking', () => {
+  const s = signal(1);
+  const c = computed(() => s.value * 2);
+  let runs = 0;
+  effect(() => {
+    runs++;
+    try {
+      untrack(() => {
+        throw new Error('x');
+      });
+    } catch {
+      /* swallowed on purpose */
+    }
+    s.value; // must still be tracked after the throw
+  });
+  expect(untrack(() => c.value)).toBe(2);
+  s.value = 5;
+  flushSync();
+  expect(runs).toBe(2);
+  expect(untrack(() => c.value)).toBe(10);
 });
