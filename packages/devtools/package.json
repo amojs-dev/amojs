@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/devtools",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS devtools — paints every DOM write on the live page: a flash per write, a glide per move, a panel of counts. Observes the DOM, not the runtime; zero dependencies.",

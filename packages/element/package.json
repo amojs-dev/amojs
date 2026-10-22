@@ -1,6 +1,6 @@
 {
   "name": "@amojs.dev/element",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "license": "MIT",
   "description": "AmoJS components as custom elements — ship one into a page that does not use AmoJS. Zero dependencies; runs raw in the browser.",

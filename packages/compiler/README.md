@@ -23,7 +23,7 @@ npm install --save-dev @amojs.dev/compiler
 ## API
 
 ```js
-import { compileModule, buildDir, ejectDir, ssgDir, vendorCore } from '@amojs.dev/compiler';
+import { compile, compileModule, buildDir, ejectDir, ssgDir, vendorCore } from '@amojs.dev/compiler';
 
 // one module, source in → source out
 const compiled = compileModule(source);

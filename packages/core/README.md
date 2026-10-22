@@ -150,7 +150,7 @@ keeps working.
 | **lifetime** | `mount` · `root` · `onCleanup` · `onMount` |
 | **scheduling** | `flushSync` · `tick` |
 
-`svg```` is `html` for a template whose ROOT is an SVG element — `<g>`, `<circle>`,
+`` svg`` `` is `` html`` `` for a template whose ROOT is an SVG element — `<g>`, `<circle>`,
 a chart's keyed row — parsed in the SVG namespace. A template that merely
 contains an `<svg>` needs nothing; the browser switches namespace at the tag.
 

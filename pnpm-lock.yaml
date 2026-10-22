@@ -80,8 +80,16 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/element:
   packages/devtools:
+    devDependencies:
+      '@amojs.dev/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@amojs.dev/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/element:
     devDependencies:
       '@amojs.dev/compiler':
         specifier: workspace:*
@@ -994,7 +1002,7 @@ snapshots:
   '@jridgewell/trace-mapping@0.3.31':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/sourcemap-codec': 1.6.0
+      '@jridgewell/sourcemap-codec': 1.5.5
 
   '@lit-labs/ssr-dom-shim@1.6.0': {}
 
