@@ -3,6 +3,7 @@ dist/
 packages/core/types/
 packages/router/types/
 packages/test/types/
+packages/element/types/
 .DS_Store
 *.log
 __tmp__/

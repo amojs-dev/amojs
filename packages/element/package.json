@@ -1,0 +1,48 @@
+{
+  "name": "@amojs.dev/element",
+  "version": "0.9.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "AmoJS components as custom elements — ship one into a page that does not use AmoJS. Zero dependencies; runs raw in the browser.",
+  "keywords": [
+    "custom-elements",
+    "web-components",
+    "signals",
+    "fine-grained",
+    "no-build",
+    "vanilla"
+  ],
+  "homepage": "https://amojs.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amojs-dev/amojs.git",
+    "directory": "packages/element"
+  },
+  "bugs": "https://github.com/amojs-dev/amojs/issues",
+  "author": "Hamidreza Behzadi <hamidbehzadi71@gmail.com>",
+  "sideEffects": false,
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "types"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "@amojs.dev/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@amojs.dev/compiler": "workspace:*",
+    "@amojs.dev/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

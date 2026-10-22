@@ -80,6 +80,15 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/element:
+    devDependencies:
+      '@amojs.dev/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@amojs.dev/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/router:
     devDependencies:
       '@amojs.dev/core':
